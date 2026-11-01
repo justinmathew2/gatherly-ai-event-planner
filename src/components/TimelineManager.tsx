@@ -664,3 +664,4 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
     </div>
   );
 };
+

@@ -202,3 +202,4 @@ export interface UserSettings {
   defaultCurrency: CurrencyCode;
   darkMode: boolean;
 }
+

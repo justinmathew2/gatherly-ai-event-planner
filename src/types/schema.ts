@@ -160,3 +160,4 @@ export const FullEventPlanSchema = z.object({
   ideas: PersonalizedIdeasSchema,
   chatHistory: z.array(z.any()).default([]),
 });
+

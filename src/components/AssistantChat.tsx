@@ -264,3 +264,4 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
     </aside>
   );
 };
+

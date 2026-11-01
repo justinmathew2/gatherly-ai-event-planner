@@ -360,3 +360,4 @@ export const SAMPLE_EVENTS: FullEventPlan[] = [
   SAMPLE_BIRTHDAY,
   SAMPLE_COMMUNITY,
 ];
+

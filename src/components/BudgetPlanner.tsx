@@ -600,3 +600,4 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
     </div>
   );
 };
+

@@ -110,3 +110,4 @@ export const deleteSingleEvent = (id: string): FullEventPlan[] => {
   }
   return allEvents;
 };
+
