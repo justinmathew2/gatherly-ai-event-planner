@@ -1,3 +1,9 @@
+/**
+ * @file AssistantChat.tsx
+ * @description Accessible conversational AI Event Copilot drawer with quick suggestions,
+ * prompt sanitization, and real-time event context grounding.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, 
@@ -5,12 +11,12 @@ import {
   X, 
   Bot, 
   User, 
-  CornerDownLeft, 
   Lightbulb, 
   Trash2 
 } from 'lucide-react';
 import { FullEventPlan, ChatMessage } from '../types/event';
 import { queryAssistantCopilot } from '../services/gemini';
+import { sanitizeText } from '../utils/security';
 
 interface AssistantChatProps {
   isOpen: boolean;
@@ -44,6 +50,17 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
@@ -59,7 +76,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
   }, [externalPrompt]);
 
   const handleSendMessage = async (textToSend?: string) => {
-    const text = (textToSend || inputMessage).trim();
+    const text = sanitizeText(textToSend || inputMessage, 500);
     if (!text || isLoading) return;
 
     const userMsg: ChatMessage = {
@@ -81,15 +98,13 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
         sender: 'assistant',
         content: response.reply,
         timestamp: new Date().toISOString(),
-        suggestedAction: response.suggestedAction,
       };
 
       onUpdatePlan({
         ...plan,
         chatHistory: [...updatedHistory, assistantMsg],
       });
-    } catch (e) {
-      console.error('Error fetching copilot response', e);
+    } catch {
       const errorMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
@@ -114,13 +129,14 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
   return (
     <aside
       aria-label="Gatherly AI Copilot Chat Drawer"
+      role="complementary"
       className="fixed inset-y-0 right-0 z-50 w-full sm:w-96 md:w-[420px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-slide-up sm:animate-fade-in"
     >
       {/* Header */}
       <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-brand-50 to-white dark:from-slate-900 dark:to-brand-950/20">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-xs">
-            <Sparkles className="w-4 h-4 animate-pulse" />
+            <Sparkles className="w-4 h-4 animate-pulse" aria-hidden="true" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-1.5">
@@ -135,16 +151,20 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
 
         <div className="flex items-center space-x-1">
           <button
+            type="button"
             onClick={handleClearChat}
-            className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition"
+            className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition focus-visible:ring-2 focus-visible:ring-rose-500"
             title="Clear Chat History"
+            aria-label="Clear chat history"
           >
             <Trash2 className="w-4 h-4" />
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition focus-visible:ring-2 focus-visible:ring-brand-500"
             title="Close Drawer"
+            aria-label="Close Copilot chat drawer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -152,7 +172,7 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite">
         {plan.chatHistory.length === 0 ? (
           <div className="py-8 text-center space-y-3">
             <div className="w-12 h-12 mx-auto rounded-full bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600">
@@ -226,8 +246,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
           {QUICK_PROMPTS.map((prompt, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => handleSendMessage(prompt)}
-              className="text-[11px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-950/50 hover:text-brand-600 dark:hover:text-brand-300 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700 transition truncate max-w-full"
+              className="text-[11px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-950/50 hover:text-brand-600 dark:hover:text-brand-300 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700 transition truncate max-w-full focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               {prompt}
             </button>
@@ -244,7 +265,11 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
           }}
           className="flex items-center space-x-2"
         >
+          <label htmlFor="copilot-user-input" className="sr-only">
+            Ask Gatherly AI Copilot
+          </label>
           <input
+            id="copilot-user-input"
             type="text"
             placeholder="Ask Copilot (e.g. 'Cut $500 from florals')..."
             value={inputMessage}
@@ -254,8 +279,9 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
           />
           <button
             type="submit"
+            aria-label="Send message to Copilot"
             disabled={!inputMessage.trim() || isLoading}
-            className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 shadow-xs transition"
+            className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 shadow-xs transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -264,4 +290,3 @@ export const AssistantChat: React.FC<AssistantChatProps> = ({
     </aside>
   );
 };
-

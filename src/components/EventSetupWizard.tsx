@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+/**
+ * @file EventSetupWizard.tsx
+ * @description Accessible 3-step event setup wizard capturing headcount,
+ * aesthetic vibes, dietary needs, accessibility features, and budget caps.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   Heart, 
   Cake, 
   Users, 
   Building, 
-  Calendar, 
-  MapPin, 
-  DollarSign, 
   ArrowRight, 
   ArrowLeft, 
   Check, 
-  CheckCircle2, 
-  X 
+  X,
+  LucideIcon 
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { EventType, CurrencyCode, CURRENCY_MAP, FullEventPlan } from '../types/event';
@@ -24,7 +27,15 @@ interface EventSetupWizardProps {
   onPlanCreated: (plan: FullEventPlan) => void;
 }
 
-const EVENT_TYPE_OPTIONS: { type: EventType; title: string; subtitle: string; icon: any; color: string }[] = [
+interface EventTypeOption {
+  type: EventType;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  color: string;
+}
+
+const EVENT_TYPE_OPTIONS: EventTypeOption[] = [
   {
     type: 'wedding',
     title: 'Wedding Celebration',
@@ -140,6 +151,17 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStepText, setGenerationStepText] = useState('');
 
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isGenerating) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isGenerating, onClose]);
+
   if (!isOpen) return null;
 
   const toggleArrayItem = (arr: string[], item: string, setter: (val: string[]) => void) => {
@@ -192,41 +214,45 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
           origin: { y: 0.6 },
           colors: ['#d74e84', '#f59e0b', '#10b981', '#6366f1', '#0284c7'],
         });
-      } catch (e) {
+      } catch {
         // ignore in test
       }
 
       onPlanCreated(generated);
       onClose();
-    } catch (e) {
-      console.error(e);
+    } catch {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wizard-modal-title"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-2xl relative my-8">
         
         {/* Close Button */}
         {!isGenerating && (
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            aria-label="Close creation wizard"
+            className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <X className="w-5 h-5" />
           </button>
         )}
 
         {isGenerating ? (
-          /* Generation Progress Animation */
           <div className="py-16 text-center space-y-6">
             <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-brand-600 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-xl shadow-brand-500/30 animate-pulse">
               <Sparkles className="w-10 h-10 animate-spin" />
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+              <h2 id="wizard-modal-title" className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                 Gatherly AI Architect at Work
               </h2>
               <p className="text-sm font-medium text-brand-600 dark:text-brand-400 h-6">
@@ -238,7 +264,6 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
             </div>
           </div>
         ) : (
-          /* Step-by-Step Intake Form */
           <div>
             {/* Wizard Step Indicator */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -246,7 +271,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                 <span className="w-7 h-7 rounded-lg bg-brand-600 text-white font-bold text-xs flex items-center justify-center">
                   {step}
                 </span>
-                <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                <span id="wizard-modal-title" className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                   {step === 1 && 'Event Details & Type'}
                   {step === 2 && 'Atmosphere, Vibe & Priorities'}
                   {step === 3 && 'Budget Cap & Inclusivity'}
@@ -262,7 +287,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                     Select Event Vertical *
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
                     {EVENT_TYPE_OPTIONS.map((opt) => {
                       const Icon = opt.icon;
                       const isSelected = eventType === opt.type;
@@ -270,11 +295,13 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                         <button
                           key={opt.type}
                           type="button"
+                          role="radio"
+                          aria-checked={isSelected}
                           onClick={() => {
                             setEventType(opt.type);
                             setVibe(VIBE_PRESETS[opt.type][0]);
                           }}
-                          className={`p-3.5 rounded-2xl border-2 text-left transition flex items-start space-x-3 ${
+                          className={`p-3.5 rounded-2xl border-2 text-left transition flex items-start space-x-3 focus-visible:ring-2 focus-visible:ring-brand-500 ${
                             isSelected
                               ? `${opt.color} shadow-sm ring-1 ring-brand-500`
                               : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
@@ -294,10 +321,11 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="wizard-title" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Celebration Title *
                   </label>
                   <input
+                    id="wizard-title"
                     type="text"
                     required
                     placeholder="e.g. Liam & Chloe's Coastal Sunset Wedding"
@@ -309,10 +337,11 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="wizard-date" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Event Date *
                     </label>
                     <input
+                      id="wizard-date"
                       type="date"
                       required
                       value={date}
@@ -321,10 +350,11 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="wizard-location" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Location / Venue City *
                     </label>
                     <input
+                      id="wizard-location"
                       type="text"
                       required
                       placeholder="e.g. Napa Valley, CA"
@@ -337,7 +367,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label htmlFor="wizard-guest-range" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                       Estimated Guest Count
                     </label>
                     <span className="text-xs font-bold text-brand-600 dark:text-brand-400">
@@ -345,13 +375,14 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                     </span>
                   </div>
                   <input
+                    id="wizard-guest-range"
                     type="range"
                     min="10"
                     max="1000"
                     step="5"
                     value={guestCount}
                     onChange={(e) => setGuestCount(Number(e.target.value))}
-                    className="w-full accent-brand-600 cursor-pointer"
+                    className="w-full accent-brand-600 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-500"
                   />
                   <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
                     <span>10 (Intimate)</span>
@@ -366,10 +397,11 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
             {step === 2 && (
               <div className="space-y-5 animate-fade-in">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="wizard-vibe" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Theme / Atmosphere Vibe *
                   </label>
                   <input
+                    id="wizard-vibe"
                     type="text"
                     required
                     placeholder="e.g. Modern Tuscan Bohemian with Terracotta and Olive Accents"
@@ -385,7 +417,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                         key={preset}
                         type="button"
                         onClick={() => setVibe(preset)}
-                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                           vibe === preset
                             ? 'bg-brand-50 border-brand-300 text-brand-700 dark:bg-brand-950 dark:border-brand-800 dark:text-brand-300 font-bold'
                             : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'
@@ -409,7 +441,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                           key={priority}
                           type="button"
                           onClick={() => toggleArrayItem(selectedPriorities, priority, setSelectedPriorities)}
-                          className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition flex items-center justify-between ${
+                          className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition flex items-center justify-between focus-visible:ring-2 focus-visible:ring-brand-500 ${
                             isSelected
                               ? 'bg-brand-50 border-brand-400 text-brand-700 dark:bg-brand-950/60 dark:border-brand-800 dark:text-brand-300'
                               : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:border-slate-300'
@@ -430,11 +462,12 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
               <div className="space-y-5 animate-fade-in">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="wizard-budget-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Total Target Budget Cap *
                     </label>
                     <div className="relative">
                       <input
+                        id="wizard-budget-input"
                         type="number"
                         min="500"
                         step="500"
@@ -447,10 +480,11 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="wizard-currency-select" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Currency
                     </label>
                     <select
+                      id="wizard-currency-select"
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                       className="w-full text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
@@ -476,7 +510,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                           key={item}
                           type="button"
                           onClick={() => toggleArrayItem(dietary, item, setDietary)}
-                          className={`text-xs px-2.5 py-1.5 rounded-xl border transition ${
+                          className={`text-xs px-2.5 py-1.5 rounded-xl border transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                             isSelected
                               ? 'bg-emerald-50 border-emerald-400 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300 font-bold'
                               : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
@@ -501,7 +535,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                           key={item}
                           type="button"
                           onClick={() => toggleArrayItem(accessibility, item, setAccessibility)}
-                          className={`text-xs px-2.5 py-1.5 rounded-xl border transition ${
+                          className={`text-xs px-2.5 py-1.5 rounded-xl border transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                             isSelected
                               ? 'bg-sky-50 border-sky-400 text-sky-800 dark:bg-sky-950 dark:border-sky-800 dark:text-sky-300 font-bold'
                               : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
@@ -522,7 +556,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(step - 1)}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Previous</span>
@@ -535,7 +569,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(step + 1)}
-                  className="flex items-center space-x-1.5 px-5 py-2.5 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm"
+                  className="flex items-center space-x-1.5 px-5 py-2.5 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
@@ -544,7 +578,7 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
                 <button
                   type="button"
                   onClick={handleCreatePlan}
-                  className="flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-brand-600 to-rose-500 hover:from-brand-700 hover:to-rose-600 text-white shadow-lg shadow-brand-500/25 transition transform active:scale-95"
+                  className="flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-brand-600 to-rose-500 hover:from-brand-700 hover:to-rose-600 text-white shadow-lg shadow-brand-500/25 transition transform active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>Generate Full Event Plan with AI</span>
@@ -558,4 +592,3 @@ export const EventSetupWizard: React.FC<EventSetupWizardProps> = ({
     </div>
   );
 };
-

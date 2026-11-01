@@ -1,4 +1,10 @@
-import React, { useState } from 'react';
+/**
+ * @file SettingsModal.tsx
+ * @description Accessible settings dialog with keyboard navigation (Escape key),
+ * model preferences, BYOK API key management, and theme configuration.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   Settings as SettingsIcon, 
   Key, 
@@ -33,10 +39,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [apiKey, setApiKey] = useState(settings.geminiApiKey || '');
   const [showKey, setShowKey] = useState(false);
-  const [model, setModel] = useState(settings.preferredModel || 'gemini-2.0-flash');
+  const [model, setModel] = useState<'gemini-2.0-flash' | 'gemini-1.5-flash'>(
+    settings.preferredModel || 'gemini-2.0-flash'
+  );
   const [currency, setCurrency] = useState<CurrencyCode>(settings.defaultCurrency || 'USD');
   const [darkMode, setDarkMode] = useState(settings.darkMode || false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Keyboard accessibility: Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -58,11 +77,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          aria-label="Close settings dialog"
+          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <X className="w-5 h-5" />
         </button>
@@ -72,7 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <SettingsIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">
+            <h2 id="settings-modal-title" className="text-lg font-black text-slate-900 dark:text-white">
               Application Settings
             </h2>
             <p className="text-xs text-slate-500">Configure your GenAI key & preferences</p>
@@ -83,7 +108,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Google Gemini API Key */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
+              <label 
+                htmlFor="gemini-api-key"
+                className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5"
+              >
                 <Key className="w-3.5 h-3.5 text-brand-600" />
                 <span>Google Gemini API Key</span>
               </label>
@@ -92,6 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="relative">
               <input
+                id="gemini-api-key"
                 type={showKey ? 'text' : 'password'}
                 placeholder="AIzaSy..."
                 value={apiKey}
@@ -101,7 +130,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -117,13 +147,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Model selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1.5">
+            <label 
+              htmlFor="model-select"
+              className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1.5"
+            >
               <Cpu className="w-3.5 h-3.5 text-indigo-500" />
               <span>Preferred Gemini Model</span>
             </label>
             <select
+              id="model-select"
               value={model}
-              onChange={(e) => setModel(e.target.value as any)}
+              onChange={(e) => setModel(e.target.value as 'gemini-2.0-flash' | 'gemini-1.5-flash')}
               className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
             >
               <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest, High Quality)</option>
@@ -133,11 +167,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Currency selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1.5">
+            <label 
+              htmlFor="currency-select"
+              className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center space-x-1.5"
+            >
               <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
               <span>Default Currency</span>
             </label>
             <select
+              id="currency-select"
               value={currency}
               onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
               className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
@@ -158,6 +196,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <button
               type="button"
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
               onClick={() => {
                 const nextDark = !darkMode;
                 setDarkMode(nextDark);
@@ -167,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   document.documentElement.classList.remove('dark');
                 }
               }}
-              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 darkMode ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700'
               }`}
             >
@@ -189,7 +228,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClose();
                 }
               }}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 flex items-center space-x-1"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 flex items-center space-x-1 focus-visible:ring-2 focus-visible:ring-rose-500"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Restore Demo Events</span>
@@ -199,14 +238,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 Cancel
               </button>
 
               <button
                 type="submit"
-                className="flex items-center space-x-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition"
+                className="flex items-center space-x-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-sm transition focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 {savedSuccess ? <Check className="w-4 h-4 text-emerald-300" /> : null}
                 <span>{savedSuccess ? 'Saved!' : 'Save Settings'}</span>
@@ -218,4 +257,3 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     </div>
   );
 };
-

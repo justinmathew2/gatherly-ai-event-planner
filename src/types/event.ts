@@ -1,3 +1,9 @@
+/**
+ * @file event.ts
+ * @description Core TypeScript type definitions and interfaces for Gatherly AI.
+ * Enforces strict typing with zero `any` declarations.
+ */
+
 export type EventType = 'wedding' | 'birthday' | 'community' | 'corporate';
 
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'INR' | 'CAD' | 'AUD';
@@ -28,11 +34,11 @@ export interface EventDetails {
   guestCount: number;
   totalBudget: number;
   currency: CurrencyCode;
-  vibe: string; // e.g. "Rustic BoHo Chic", "Neon Cyberpunk 80s", "Warm Autumn Community Festival"
+  vibe: string;
   themeDescription: string;
-  primaryPriorities: string[]; // e.g. ["Great Food", "Memorable Photography", "Dancing"]
-  dietaryRestrictions: string[]; // e.g. ["Vegan", "Gluten-Free", "Nut-Free"]
-  accessibilityNeeds: string[]; // e.g. ["Wheelchair Accessible", "Sensory Quiet Zone"]
+  primaryPriorities: string[];
+  dietaryRestrictions: string[];
+  accessibilityNeeds: string[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -93,7 +99,7 @@ export interface MilestoneItem {
 
 export interface DayOfScheduleItem {
   id: string;
-  time: string; // e.g. "14:00" or "2:00 PM"
+  time: string; // e.g. "14:00"
   endTime?: string;
   activity: string;
   location: string;
@@ -143,7 +149,37 @@ export interface Vendor {
 export interface ColorPaletteItem {
   name: string;
   hex: string;
-  role: string; // e.g. "Primary Accent", "Soft Neutral", "Gilded Trim"
+  role: string;
+}
+
+export interface SignatureDrink {
+  name: string;
+  description: string;
+  isAlcoholic: boolean;
+}
+
+export interface MenuSuggestions {
+  appetizers: string[];
+  mains: string[];
+  desserts: string[];
+  signatureDrinks: SignatureDrink[];
+}
+
+export interface InvitationWording {
+  formal: string;
+  modernPlayful: string;
+  casual: string;
+}
+
+export interface ActivityItem {
+  title: string;
+  description: string;
+  timing: string;
+}
+
+export interface MusicPlaylistVibe {
+  style: string;
+  sampleTracks: string[];
 }
 
 export interface PersonalizedIdeas {
@@ -151,27 +187,20 @@ export interface PersonalizedIdeas {
   tagline: string;
   palette: ColorPaletteItem[];
   decorConcepts: string[];
-  menuSuggestions: {
-    appetizers: string[];
-    mains: string[];
-    desserts: string[];
-    signatureDrinks: { name: string; description: string; isAlcoholic: boolean }[];
-  };
-  invitationWording: {
-    formal: string;
-    modernPlayful: string;
-    casual: string;
-  };
-  activitiesAndEntertainment: {
-    title: string;
-    description: string;
-    timing: string;
-  }[];
-  musicPlaylistVibes: {
-    style: string;
-    sampleTracks: string[];
-  }[];
+  menuSuggestions: MenuSuggestions;
+  invitationWording: InvitationWording;
+  activitiesAndEntertainment: ActivityItem[];
+  musicPlaylistVibes: MusicPlaylistVibe[];
   costSavingHacks: string[];
+}
+
+export interface ChatActionPayload {
+  category?: BudgetCategoryType;
+  amount?: number;
+  milestoneTitle?: string;
+  phase?: MilestonePhase;
+  targetDate?: string;
+  vendorName?: string;
 }
 
 export interface ChatMessage {
@@ -182,7 +211,7 @@ export interface ChatMessage {
   suggestedAction?: {
     type: 'apply_budget_rebalance' | 'add_milestone' | 'add_vendor' | 'update_theme';
     label: string;
-    payload: any;
+    payload?: ChatActionPayload;
   };
 }
 
@@ -203,3 +232,26 @@ export interface UserSettings {
   darkMode: boolean;
 }
 
+/**
+ * Standardized Custom Domain Errors
+ */
+export class EventPlannerError extends Error {
+  constructor(message: string, public readonly code: string = 'PLANNER_ERROR') {
+    super(message);
+    this.name = 'EventPlannerError';
+  }
+}
+
+export class ValidationError extends EventPlannerError {
+  constructor(message: string) {
+    super(message, 'VALIDATION_ERROR');
+    this.name = 'ValidationError';
+  }
+}
+
+export class AiServiceError extends EventPlannerError {
+  constructor(message: string, public readonly originalError?: unknown) {
+    super(message, 'AI_SERVICE_ERROR');
+    this.name = 'AiServiceError';
+  }
+}

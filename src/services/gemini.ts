@@ -1,40 +1,53 @@
+/**
+ * @file gemini.ts
+ * @description Google Gemini Generative AI service with prompt injection defense,
+ * Zod schema validation, and intelligent offline fallback engine.
+ */
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { 
   FullEventPlan, 
-  EventDetails, 
   BudgetItem, 
   MilestoneItem, 
   DayOfScheduleItem, 
   Vendor, 
   PersonalizedIdeas,
-  EventType 
+  EventType, 
+  CurrencyCode,
+  AiServiceError
 } from '../types/event';
 import { FullEventPlanSchema } from '../types/schema';
 import { getStoredSettings } from './storage';
+import { sanitizeText } from '../utils/security';
 
-// Helper to sanitize and extract JSON from AI response
-const extractJsonFromResponse = (text: string): any => {
-  // Try direct parse first
+/**
+ * Extracts and sanitizes valid JSON payload from generative text responses.
+ * Handles markdown fence stripping and boundary extraction.
+ *
+ * @param text - The raw model text output
+ * @returns Parsed JSON object
+ */
+export const extractJsonFromResponse = (text: string): unknown => {
   try {
     return JSON.parse(text);
   } catch {
-    // Look for markdown ```json ... ``` blocks
+    // 1. Match standard ```json ... ``` or ``` ... ```
     const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (match && match[1]) {
       try {
         return JSON.parse(match[1]);
       } catch (innerErr) {
-        console.error('Failed to parse matched JSON block', innerErr);
+        // Continue to fallback
       }
     }
-    // Fallback: look for first { and last }
+    // 2. Find outermost curly braces
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       const sliced = text.substring(firstBrace, lastBrace + 1);
       return JSON.parse(sliced);
     }
-    throw new Error('Could not parse valid JSON from AI response');
+    throw new AiServiceError('Could not parse valid JSON from AI response');
   }
 };
 
@@ -52,15 +65,33 @@ export interface GenerateEventPlanInput {
   accessibilityNeeds: string[];
 }
 
+/**
+ * Generates a full master celebration plan using Google Gemini API.
+ * Falls back to the procedural intelligence engine when offline or unauthenticated.
+ */
 export const generateEventPlanWithAI = async (
-  input: GenerateEventPlanInput,
+  rawInput: GenerateEventPlanInput,
   apiKeyOverride?: string
 ): Promise<FullEventPlan> => {
+  // Sanitize all inputs to protect against prompt injection and XSS
+  const input: GenerateEventPlanInput = {
+    title: sanitizeText(rawInput.title, 100),
+    eventType: rawInput.eventType,
+    date: sanitizeText(rawInput.date, 20),
+    location: sanitizeText(rawInput.location, 150),
+    guestCount: Math.max(1, Math.min(50000, Number(rawInput.guestCount) || 50)),
+    totalBudget: Math.max(0, Math.min(100000000, Number(rawInput.totalBudget) || 10000)),
+    currency: sanitizeText(rawInput.currency, 5),
+    vibe: sanitizeText(rawInput.vibe, 200),
+    primaryPriorities: rawInput.primaryPriorities.map((p) => sanitizeText(p, 80)),
+    dietaryRestrictions: rawInput.dietaryRestrictions.map((d) => sanitizeText(d, 60)),
+    accessibilityNeeds: rawInput.accessibilityNeeds.map((a) => sanitizeText(a, 60)),
+  };
+
   const settings = getStoredSettings();
   const apiKey = apiKeyOverride || settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
 
   if (!apiKey || apiKey.trim() === '') {
-    // Generate intelligent offline structured plan tailored to inputs
     return generateOfflineEventPlan(input);
   }
 
@@ -76,15 +107,15 @@ export const generateEventPlanWithAI = async (
       },
     });
 
-    const systemPrompt = `You are Gatherly AI, a world-class certified master event planner specializing in weddings, birthdays, community festivals, and celebrations.
+    const systemPrompt = `You are Gatherly AI, a master event planner specializing in weddings, birthdays, community festivals, and celebrations.
 Generate a comprehensive, mathematically consistent, highly personalized event plan in strict JSON format based on the user's requirements.
 
 Ensure:
-1. Budget items strictly sum up to close to the total budget (${input.currency} ${input.totalBudget}).
+1. Budget items strictly sum up close to the total budget (${input.currency} ${input.totalBudget}).
 2. Timeline milestones span from 6-12 months out down to the day before.
-3. Day-of schedule provides an hour-by-hour run of show with realistic timings.
+3. Day-of schedule provides an hour-by-hour run of show with realistic timings in HH:MM format.
 4. Vendors have realistic price estimates, categories, and practical roles.
-5. Personalized ideas include aesthetic color palette with valid hex codes, unique decor concepts, multi-course menu suggestions accommodating dietary restrictions (${input.dietaryRestrictions.join(', ') || 'Standard'}), custom invitation copies in 3 tones, interactive activities, and cost-saving hacks.
+5. Personalized ideas include aesthetic color palette with valid hex codes (#RRGGBB), unique decor concepts, multi-course menu suggestions accommodating dietary restrictions (${input.dietaryRestrictions.join(', ') || 'Standard'}), custom invitation copies in 3 tones, interactive activities, and cost-saving hacks.
 
 Output schema:
 {
@@ -93,8 +124,8 @@ Output schema:
     "title": string,
     "eventType": "${input.eventType}",
     "date": "${input.date}",
-    "startTime": string,
-    "endTime": string,
+    "startTime": "HH:MM",
+    "endTime": "HH:MM",
     "location": "${input.location}",
     "guestCount": ${input.guestCount},
     "totalBudget": ${input.totalBudget},
@@ -188,7 +219,7 @@ Output schema:
   }
 }`;
 
-    const userPrompt = `Event Request:
+    const userPrompt = `Event Requirements:
 Title: ${input.title}
 Event Type: ${input.eventType}
 Date: ${input.date}
@@ -210,9 +241,9 @@ Generate the full JSON now.`;
     const responseText = result.response.text();
     const parsedData = extractJsonFromResponse(responseText);
 
-    // Validate using Zod
+    // Validate using Zod schema
     const validated = FullEventPlanSchema.safeParse({
-      ...parsedData,
+      ...(parsedData as object),
       chatHistory: [
         {
           id: `chat-${Date.now()}`,
@@ -226,26 +257,27 @@ Generate the full JSON now.`;
     if (validated.success) {
       return validated.data as FullEventPlan;
     } else {
-      console.warn('AI response did not strictly match schema, patching with fallback', validated.error);
-      return generateOfflineEventPlan(input, parsedData);
+      return generateOfflineEventPlan(input, parsedData as Partial<FullEventPlan>);
     }
   } catch (error) {
-    console.error('Error invoking Gemini API, falling back to smart local engine:', error);
     return generateOfflineEventPlan(input);
   }
 };
 
-// Procedural, highly realistic offline event planner when no API key is set
+/**
+ * Procedural fallback planner delivering instant, mathematically consistent,
+ * realistic plans tailored to custom inputs without network latency.
+ */
 export const generateOfflineEventPlan = (
   input: GenerateEventPlanInput,
   partial?: Partial<FullEventPlan>
 ): FullEventPlan => {
-  const budget = input.totalBudget;
+  const budget = Math.max(500, input.totalBudget);
   const isWedding = input.eventType === 'wedding';
   const isBirthday = input.eventType === 'birthday';
   const isCommunity = input.eventType === 'community';
 
-  // Industry benchmark percentage allocations
+  // Industry-proven percentage allocations
   const venuePct = isCommunity ? 0.25 : 0.35;
   const cateringPct = isCommunity ? 0.20 : 0.30;
   const photoPct = isCommunity ? 0.08 : (isBirthday ? 0.10 : 0.12);
@@ -524,7 +556,7 @@ export const generateOfflineEventPlan = (
       location: input.location,
       guestCount: input.guestCount,
       totalBudget: input.totalBudget,
-      currency: input.currency as any,
+      currency: (input.currency as CurrencyCode) || 'USD',
       vibe: input.vibe,
       themeDescription: `A masterfully planned ${input.eventType} celebration at ${input.location} for ${input.guestCount} guests.`,
       primaryPriorities: input.primaryPriorities,
@@ -549,11 +581,16 @@ export const generateOfflineEventPlan = (
   };
 };
 
-// Generate vendor inquiry email draft
+/**
+ * Generates an inquiry email draft addressed to an external vendor.
+ */
 export const generateVendorInquiryEmail = async (
   vendor: Vendor,
   plan: FullEventPlan
 ): Promise<string> => {
+  const sanitizedVendorName = sanitizeText(vendor.name, 100);
+  const sanitizedContact = sanitizeText(vendor.contactPerson || '', 80);
+
   const settings = getStoredSettings();
   const apiKey = settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
 
@@ -561,33 +598,32 @@ export const generateVendorInquiryEmail = async (
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: settings.preferredModel || 'gemini-2.0-flash' });
-      const prompt = `Write a professional, gracious, and specific inquiry email from an event host to a potential vendor.
+      const prompt = `Write a professional, gracious inquiry email from an event host to a potential vendor.
 Event: ${plan.details.title} (${plan.details.eventType})
 Date: ${plan.details.date}
 Location: ${plan.details.location}
 Guest Count: ${plan.details.guestCount}
 Vendor Category: ${vendor.category}
-Vendor Name: ${vendor.name}
+Vendor Name: ${sanitizedVendorName}
 Budget estimate: ${plan.details.currency} ${vendor.estimatedCost}
 Host vibe/theme: ${plan.details.vibe}
 
-Include polite requests for their availability, package pricing, and next steps for a brief consultation call.`;
+Include polite requests for their availability, package pricing, and next steps for an introductory consultation call.`;
 
       const res = await model.generateContent(prompt);
       return res.response.text();
-    } catch (e) {
-      console.warn('AI vendor email call failed, using template', e);
+    } catch {
+      // Fallback to template
     }
   }
 
-  // Template fallback
-  return `Subject: Inquiry for ${plan.details.title} on ${plan.details.date} - ${vendor.name}
+  return `Subject: Inquiry for ${plan.details.title} on ${plan.details.date} - ${sanitizedVendorName}
 
-Dear ${vendor.contactPerson || vendor.name + ' Team'},
+Dear ${sanitizedContact || sanitizedVendorName + ' Team'},
 
 I hope this email finds you well!
 
-We are currently planning "${plan.details.title}", a ${plan.details.eventType} celebration scheduled for ${plan.details.date} at ${plan.details.location}, and we love your work in ${vendor.category}.
+We are currently organizing "${plan.details.title}", a ${plan.details.eventType} celebration scheduled for ${plan.details.date} at ${plan.details.location}, and we love your work in ${vendor.category}.
 
 Here are key details regarding our event:
 - Date: ${plan.details.date}
@@ -603,7 +639,9 @@ Warm regards,
 ${plan.details.title} Organizing Team`;
 };
 
-// Generate interview questions to ask vendors
+/**
+ * Generates top 5 targeted interview questions per vendor category.
+ */
 export const generateVendorQuestions = async (
   vendor: Vendor,
   plan: FullEventPlan
@@ -623,13 +661,14 @@ Return strictly a JSON array of strings: ["question 1", "question 2", ...]`;
 
       const res = await model.generateContent(prompt);
       const parsed = extractJsonFromResponse(res.response.text());
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {
-      console.warn('AI vendor questions call failed, using fallback', e);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item) => String(item));
+      }
+    } catch {
+      // Fallback
     }
   }
 
-  // Fallback high-impact questions by category
   if (vendor.category === 'Venue') {
     return [
       'What is your exact policy and fee structure for overtime hours or extended cleanup?',
@@ -665,11 +704,14 @@ Return strictly a JSON array of strings: ["question 1", "question 2", ...]`;
   }
 };
 
-// Conversational AI Assistant
+/**
+ * Conversational Assistant Copilot query handler.
+ */
 export const queryAssistantCopilot = async (
-  message: string,
+  rawMessage: string,
   plan: FullEventPlan
-): Promise<{ reply: string; suggestedAction?: any }> => {
+): Promise<{ reply: string }> => {
+  const message = sanitizeText(rawMessage, 500);
   const settings = getStoredSettings();
   const apiKey = settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
 
@@ -690,16 +732,15 @@ Current Event Context:
 
 User query: "${message}"
 
-Give a concise, practical, highly encouraging response with concrete ideas or actionable advice. If relevant, format with clear bullet points.`;
+Give a concise, practical, highly encouraging response with concrete ideas or actionable advice.`;
 
       const res = await model.generateContent(prompt);
       return { reply: res.response.text() };
-    } catch (e) {
-      console.warn('AI copilot call failed, using intelligent offline helper', e);
+    } catch {
+      // Fallback
     }
   }
 
-  // Intelligent offline contextual response
   const lower = message.toLowerCase();
   if (lower.includes('budget') || lower.includes('save') || lower.includes('cut') || lower.includes('cost')) {
     const totalSpent = plan.budgetItems.reduce((acc, i) => acc + i.actualAmount, 0);
@@ -728,4 +769,3 @@ Pro-tip: Always request their Certificate of Insurance (COI) at least 30 days pr
     };
   }
 };
-

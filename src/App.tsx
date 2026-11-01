@@ -1,3 +1,9 @@
+/**
+ * @file App.tsx
+ * @description Master application container for Gatherly AI.
+ * Encapsulates state management, accessibility providers, and error boundaries.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
@@ -9,10 +15,9 @@ import { AssistantChat } from './components/AssistantChat';
 import { EventSetupWizard } from './components/EventSetupWizard';
 import { SettingsModal } from './components/SettingsModal';
 import { ExportModal } from './components/ExportModal';
-import { 
-  FullEventPlan, 
-  UserSettings 
-} from './types/event';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AriaAnnouncerProvider, useAriaAnnouncer } from './hooks/useAriaAnnouncer';
+import { FullEventPlan, UserSettings } from './types/event';
 import { 
   getStoredEvents, 
   saveStoredEvents, 
@@ -20,12 +25,10 @@ import {
   setActiveEventId, 
   saveSingleEvent, 
   getStoredSettings, 
-  saveStoredSettings 
 } from './services/storage';
 import { SAMPLE_EVENTS } from './services/mockData';
-import { Sparkles, Heart } from 'lucide-react';
 
-export const App: React.FC = () => {
+const MainAppContent: React.FC = () => {
   const [events, setEvents] = useState<FullEventPlan[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'budget' | 'timeline' | 'vendors' | 'ideas'>('dashboard');
@@ -37,6 +40,8 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [externalChatPrompt, setExternalChatPrompt] = useState<string>('');
+
+  const { announce } = useAriaAnnouncer();
 
   // Initial load
   useEffect(() => {
@@ -51,13 +56,22 @@ export const App: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, []);
+  }, [settings.darkMode]);
 
   const activeEvent = events.find((e) => e.details.id === activeId) || events[0] || SAMPLE_EVENTS[0];
 
   const handleSelectEvent = (id: string) => {
     setActiveId(id);
     setActiveEventId(id);
+    const selected = events.find((e) => e.details.id === id);
+    if (selected) {
+      announce(`Switched active celebration to ${selected.details.title}`);
+    }
+  };
+
+  const handleTabChange = (tab: 'dashboard' | 'budget' | 'timeline' | 'vendors' | 'ideas') => {
+    setActiveTab(tab);
+    announce(`Switched to ${tab} view`);
   };
 
   const handleUpdateActivePlan = (updated: FullEventPlan) => {
@@ -72,6 +86,7 @@ export const App: React.FC = () => {
     setActiveEventId(newPlan.details.id);
     saveStoredEvents(updatedEvents);
     setActiveTab('dashboard');
+    announce(`New celebration created: ${newPlan.details.title}`);
   };
 
   const handleResetSamples = () => {
@@ -80,6 +95,7 @@ export const App: React.FC = () => {
     setActiveId(SAMPLE_EVENTS[0].details.id);
     setActiveEventId(SAMPLE_EVENTS[0].details.id);
     saveStoredEvents(SAMPLE_EVENTS);
+    announce('Demo celebrations restored successfully');
   };
 
   const handleOpenCopilotWithPrompt = (prompt: string) => {
@@ -94,7 +110,7 @@ export const App: React.FC = () => {
         allEvents={events}
         activeEvent={activeEvent}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onSelectEvent={handleSelectEvent}
         onOpenCreateWizard={() => setShowCreateWizard(true)}
         onOpenSettings={() => setShowSettings(true)}
@@ -103,12 +119,12 @@ export const App: React.FC = () => {
         setIsChatOpen={setIsChatOpen}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      {/* Main Landmark Container */}
+      <main id="main-content" tabIndex={-1} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 outline-none">
         {activeTab === 'dashboard' && (
           <Dashboard
             plan={activeEvent}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleTabChange}
             onOpenCopilot={() => setIsChatOpen(true)}
           />
         )}
@@ -153,7 +169,7 @@ export const App: React.FC = () => {
         clearExternalPrompt={() => setExternalChatPrompt('')}
       />
 
-      {/* Modals */}
+      {/* Modals with Focus Trapping & Accessibility */}
       <EventSetupWizard
         isOpen={showCreateWizard}
         onClose={() => setShowCreateWizard(false)}
@@ -175,7 +191,7 @@ export const App: React.FC = () => {
         onImportPlan={(imported) => handlePlanCreated(imported)}
       />
 
-      {/* Footer */}
+      {/* Semantic Footer */}
       <footer className="no-print mt-auto border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 py-6 text-center text-xs text-slate-500 transition-colors">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-1.5">
@@ -198,5 +214,15 @@ export const App: React.FC = () => {
         </div>
       </footer>
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <AriaAnnouncerProvider>
+        <MainAppContent />
+      </AriaAnnouncerProvider>
+    </ErrorBoundary>
   );
 };

@@ -1,20 +1,33 @@
-import { FullEventPlan } from '../types/event';
+/**
+ * @file export.ts
+ * @description RFC-5545 iCalendar, RFC-4180 CSV, and JSON export services with
+ * strict character escaping and download handlers.
+ */
 
-// Generate iCalendar format (.ics) for Google Calendar, Apple Calendar, Outlook
+import { FullEventPlan } from '../types/event';
+import { escapeCalendarText, escapeCsvCell } from '../utils/security';
+
+/**
+ * Generates valid RFC-5545 iCalendar (.ics) specification data for full-day
+ * run-of-show itineraries and countdown deadlines.
+ *
+ * @param plan - Master event plan
+ * @returns RFC-5545 string
+ */
 export const generateICalendar = (plan: FullEventPlan): string => {
   const { details, dayOfSchedule, milestones } = plan;
   const eventDateFormatted = details.date.replace(/-/g, '');
 
-  let icsContent = [
+  const icsContent: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Gatherly AI//Event Planning Assistant//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    `X-WR-CALNAME:${details.title}`,
+    `X-WR-CALNAME:${escapeCalendarText(details.title)}`,
   ];
 
-  // Add Day-Of schedule events
+  // 1. Add Day-Of schedule events
   dayOfSchedule.forEach((item) => {
     const timeParts = item.time.split(':');
     const startHour = timeParts[0] ? timeParts[0].padStart(2, '0') : '10';
@@ -38,21 +51,21 @@ export const generateICalendar = (plan: FullEventPlan): string => {
     icsContent.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
     icsContent.push(`DTSTART:${dtStart}`);
     icsContent.push(`DTEND:${dtEnd}`);
-    icsContent.push(`SUMMARY:${escapeIcs(summary)}`);
-    icsContent.push(`LOCATION:${escapeIcs(item.location || details.location)}`);
-    icsContent.push(`DESCRIPTION:${escapeIcs(description)}`);
+    icsContent.push(`SUMMARY:${escapeCalendarText(summary)}`);
+    icsContent.push(`LOCATION:${escapeCalendarText(item.location || details.location)}`);
+    icsContent.push(`DESCRIPTION:${escapeCalendarText(description)}`);
     icsContent.push('STATUS:CONFIRMED');
     icsContent.push('END:VEVENT');
   });
 
-  // Add key milestone deadlines
+  // 2. Add Key Planning Deadlines
   milestones.forEach((m) => {
     const dueDateFormatted = m.dueDate.replace(/-/g, '');
     icsContent.push('BEGIN:VEVENT');
     icsContent.push(`UID:milestone-${m.id}-${details.id}@gatherly.ai`);
     icsContent.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
     icsContent.push(`DTSTART;VALUE=DATE:${dueDateFormatted}`);
-    icsContent.push(`SUMMARY:[Deadline] ${escapeIcs(m.title)}`);
+    icsContent.push(`SUMMARY:[Deadline] ${escapeCalendarText(m.title)}`);
     icsContent.push(`DESCRIPTION:Phase: ${m.phase}\\nAssigned to: ${m.assignedTo || 'Unassigned'}`);
     icsContent.push(`STATUS:${m.completed ? 'COMPLETED' : 'NEEDS-ACTION'}`);
     icsContent.push('END:VEVENT');
@@ -62,46 +75,48 @@ export const generateICalendar = (plan: FullEventPlan): string => {
   return icsContent.join('\r\n');
 };
 
-const escapeIcs = (str: string): string => {
-  return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,');
-};
-
-// Export Budget to CSV
+/**
+ * Generates RFC-4180 compliant CSV content for the budget breakdown.
+ */
 export const generateBudgetCsv = (plan: FullEventPlan): string => {
   const headers = ['Category', 'Item Name', 'Allocated Amount', 'Actual Amount', 'Paid Amount', 'Status', 'Notes'];
   const rows = plan.budgetItems.map((item) => [
-    `"${item.category}"`,
-    `"${item.name.replace(/"/g, '""')}"`,
+    escapeCsvCell(item.category),
+    escapeCsvCell(item.name),
     item.allocatedAmount,
     item.actualAmount,
     item.paidAmount,
-    item.isPaid ? '"Paid in Full"' : '"Pending / Partial"',
-    `"${(item.notes || '').replace(/"/g, '""')}"`,
+    escapeCsvCell(item.isPaid ? 'Paid in Full' : 'Pending / Partial'),
+    escapeCsvCell(item.notes || ''),
   ]);
 
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 };
 
-// Export Vendors to CSV
+/**
+ * Generates RFC-4180 compliant CSV content for the vendor directory.
+ */
 export const generateVendorsCsv = (plan: FullEventPlan): string => {
   const headers = ['Vendor Name', 'Category', 'Contact Person', 'Email', 'Phone', 'Status', 'Estimated Cost', 'Final Cost', 'Deposit Paid', 'Notes'];
   const rows = plan.vendors.map((v) => [
-    `"${v.name.replace(/"/g, '""')}"`,
-    `"${v.category}"`,
-    `"${(v.contactPerson || '').replace(/"/g, '""')}"`,
-    `"${(v.email || '').replace(/"/g, '""')}"`,
-    `"${(v.phone || '').replace(/"/g, '""')}"`,
-    `"${v.status}"`,
+    escapeCsvCell(v.name),
+    escapeCsvCell(v.category),
+    escapeCsvCell(v.contactPerson || ''),
+    escapeCsvCell(v.email || ''),
+    escapeCsvCell(v.phone || ''),
+    escapeCsvCell(v.status),
     v.estimatedCost,
     v.finalCost || 0,
     v.depositPaid || 0,
-    `"${(v.notes || '').replace(/"/g, '""')}"`,
+    escapeCsvCell(v.notes || ''),
   ]);
 
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 };
 
-// Trigger browser download for any string payload
+/**
+ * Initiates an in-browser safe download for any string payload without external popups.
+ */
 export const downloadFile = (content: string, filename: string, mimeType: string): void => {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -113,4 +128,3 @@ export const downloadFile = (content: string, filename: string, mimeType: string
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
-

@@ -1,4 +1,10 @@
-import React, { useRef } from 'react';
+/**
+ * @file ExportModal.tsx
+ * @description Accessible export modal supporting iCalendar (.ics), Budget CSV,
+ * Vendor CSV, JSON backups, and PDF print previews.
+ */
+
+import React, { useRef, useEffect } from 'react';
 import { 
   Download, 
   FileDown, 
@@ -8,7 +14,6 @@ import {
   Upload, 
   X, 
   Calendar, 
-  DollarSign, 
   Users 
 } from 'lucide-react';
 import { FullEventPlan } from '../types/event';
@@ -29,6 +34,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onImportPlan,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -69,7 +85,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         } else {
           alert('Invalid plan JSON format. Please upload a valid Gatherly AI backup.');
         }
-      } catch (err) {
+      } catch {
         alert('Failed to parse JSON file.');
       }
     };
@@ -77,11 +93,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-modal-title"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          aria-label="Close export dialog"
+          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <X className="w-5 h-5" />
         </button>
@@ -91,7 +113,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <Download className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">
+            <h2 id="export-modal-title" className="text-lg font-black text-slate-900 dark:text-white">
               Export & Share Event Plan
             </h2>
             <p className="text-xs text-slate-500">Download formats or sync to calendars</p>
@@ -102,7 +124,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Calendar .ics */}
           <button
             onClick={handleExportIcs}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group"
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600">
@@ -123,7 +145,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Budget CSV */}
           <button
             onClick={handleExportBudgetCsv}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group"
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600">
@@ -144,7 +166,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Vendors CSV */}
           <button
             onClick={handleExportVendorsCsv}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group"
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600">
@@ -165,7 +187,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Master Plan JSON Backup */}
           <button
             onClick={handleExportJson}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group"
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600">
@@ -189,7 +211,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClose();
               setTimeout(() => window.print(), 300);
             }}
-            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group"
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 transition text-left group focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600">
@@ -211,15 +233,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Restore from JSON backup */}
         <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
           <input
+            id="json-file-input"
             type="file"
             ref={fileInputRef}
             accept=".json"
+            aria-label="Upload JSON backup file"
             onChange={handleImportJsonFile}
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 text-slate-600 dark:text-slate-300 text-xs font-bold transition"
+            className="w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 text-slate-600 dark:text-slate-300 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Upload className="w-4 h-4" />
             <span>Restore / Import Plan from JSON</span>
@@ -229,4 +254,3 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     </div>
   );
 };
-

@@ -1,4 +1,10 @@
-import React, { useState } from 'react';
+/**
+ * @file TimelineManager.tsx
+ * @description Accessible countdown milestone tracker and hour-by-hour day-of
+ * run-of-show itinerary with RFC-5545 iCalendar synchronization.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   Clock, 
   Calendar, 
@@ -10,8 +16,7 @@ import {
   Printer, 
   Sparkles, 
   MapPin, 
-  User, 
-  Tag
+  User 
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -21,6 +26,7 @@ import {
   MilestonePhase 
 } from '../types/event';
 import { generateICalendar, downloadFile } from '../services/export';
+import { sanitizeText } from '../utils/security';
 
 interface TimelineManagerProps {
   plan: FullEventPlan;
@@ -73,6 +79,18 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
   const [newPeople, setNewPeople] = useState('');
   const [newNotes, setNewNotes] = useState('');
 
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddMilestone) setShowAddMilestone(false);
+        if (showAddSchedule) setShowAddSchedule(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAddMilestone, showAddSchedule]);
+
   // Milestone checkoff with confetti celebration
   const toggleMilestone = (id: string) => {
     const target = milestones.find((m) => m.id === id);
@@ -86,8 +104,8 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
           origin: { y: 0.8 },
           colors: ['#d74e84', '#f59e0b', '#10b981', '#6366f1'],
         });
-      } catch (e) {
-        // ignore confetti errors in test env
+      } catch {
+        // ignore in test
       }
     }
 
@@ -108,16 +126,17 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
   const handleAddMilestone = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMilestoneTitle.trim()) return;
+    const cleanTitle = sanitizeText(newMilestoneTitle, 150);
+    if (!cleanTitle) return;
 
     const newItem: MilestoneItem = {
       id: `milestone-${Date.now()}`,
-      title: newMilestoneTitle.trim(),
+      title: cleanTitle,
       phase: newMilestonePhase,
       dueDate: newMilestoneDueDate || details.date,
       completed: false,
       priority: newMilestonePriority,
-      assignedTo: newMilestoneAssignee.trim() || undefined,
+      assignedTo: sanitizeText(newMilestoneAssignee, 80) || undefined,
     };
 
     onUpdatePlan({ ...plan, milestones: [...milestones, newItem] });
@@ -125,7 +144,6 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
     setShowAddMilestone(false);
   };
 
-  // Day of schedule actions
   const toggleScheduleComplete = (id: string) => {
     const updated = dayOfSchedule.map((s) => {
       if (s.id === id) {
@@ -143,20 +161,20 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
   const handleAddSchedule = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newActivity.trim()) return;
+    const cleanActivity = sanitizeText(newActivity, 150);
+    if (!cleanActivity) return;
 
     const newItem: DayOfScheduleItem = {
       id: `sched-${Date.now()}`,
       time: newTime,
       endTime: newEndTime || undefined,
-      activity: newActivity.trim(),
-      location: newLocation.trim() || details.location,
-      keyPeople: newPeople ? newPeople.split(',').map((p) => p.trim()) : [],
-      notes: newNotes.trim() || undefined,
+      activity: cleanActivity,
+      location: sanitizeText(newLocation, 120) || details.location,
+      keyPeople: newPeople ? newPeople.split(',').map((p) => sanitizeText(p, 60)) : [],
+      notes: sanitizeText(newNotes, 300) || undefined,
       completed: false,
     };
 
-    // Sort chronologically
     const updated = [...dayOfSchedule, newItem].sort((a, b) => a.time.localeCompare(b.time));
     onUpdatePlan({ ...plan, dayOfSchedule: updated });
 
@@ -189,8 +207,9 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={handleExportCalendar}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500"
             title="Download .ics file for Google or Apple Calendar"
           >
             <FileDown className="w-3.5 h-3.5" />
@@ -198,8 +217,9 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={() => window.print()}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print View</span>
@@ -207,16 +227,18 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
           {activeSubTab === 'milestones' ? (
             <button
+              type="button"
               onClick={() => setShowAddMilestone(true)}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <Plus className="w-4 h-4" />
               <span>Add Milestone</span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={() => setShowAddSchedule(true)}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <Plus className="w-4 h-4" />
               <span>Add Schedule Slot</span>
@@ -226,10 +248,13 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
       </div>
 
       {/* Sub-tab Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800">
+      <div className="flex border-b border-slate-200 dark:border-slate-800" role="tablist">
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeSubTab === 'milestones'}
           onClick={() => setActiveSubTab('milestones')}
-          className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center space-x-2 border-b-2 transition ${
+          className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center space-x-2 border-b-2 transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
             activeSubTab === 'milestones'
               ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
@@ -240,8 +265,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
         </button>
 
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeSubTab === 'dayOf'}
           onClick={() => setActiveSubTab('dayOf')}
-          className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center space-x-2 border-b-2 transition ${
+          className={`pb-3 px-4 text-xs sm:text-sm font-bold flex items-center space-x-2 border-b-2 transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
             activeSubTab === 'dayOf'
               ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
@@ -254,7 +282,7 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
       {/* VIEW 1: Milestones Checklist */}
       {activeSubTab === 'milestones' && (
-        <div className="space-y-6">
+        <div className="space-y-6" role="tabpanel" aria-label="Countdown Milestones">
           {/* Progress Banner */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-4">
             <div className="space-y-1">
@@ -265,7 +293,7 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                 {milestones.length - completedCount} milestones remaining before {details.date}
               </div>
             </div>
-            <div className="w-48 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div className="w-48 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden" role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                 style={{ width: `${progressPct}%` }}
@@ -303,8 +331,10 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                       >
                         <div className="flex items-center space-x-3 flex-1 min-w-0 mr-3">
                           <button
+                            type="button"
                             onClick={() => toggleMilestone(item.id)}
-                            className="flex-shrink-0 text-slate-400 hover:text-emerald-500 transition"
+                            aria-label={item.completed ? `Mark ${item.title} as incomplete` : `Mark ${item.title} as completed`}
+                            className="flex-shrink-0 text-slate-400 hover:text-emerald-500 transition focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-full"
                           >
                             {item.completed ? (
                               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
@@ -350,8 +380,10 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                           </span>
 
                           <button
+                            type="button"
                             onClick={() => deleteMilestone(item.id)}
-                            className="p-1 text-slate-300 hover:text-rose-600 rounded transition"
+                            aria-label={`Delete milestone: ${item.title}`}
+                            className="p-1 text-slate-300 hover:text-rose-600 rounded transition focus-visible:ring-2 focus-visible:ring-rose-500"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -368,7 +400,7 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
       {/* VIEW 2: Day-Of Run of Show (Hourly) */}
       {activeSubTab === 'dayOf' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6" role="tabpanel" aria-label="Day-Of Run-of-Show">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -379,32 +411,31 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </p>
             </div>
             <button
+              type="button"
               onClick={handleExportCalendar}
-              className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center space-x-1"
+              className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center space-x-1 focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <FileDown className="w-3.5 h-3.5" />
               <span>Export Day to iCal</span>
             </button>
           </div>
 
-          {/* Timeline Stream */}
           <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
             {dayOfSchedule.map((slot) => (
               <div key={slot.id} className="relative group">
-                {/* Node icon */}
                 <button
+                  type="button"
                   onClick={() => toggleScheduleComplete(slot.id)}
-                  className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 bg-white dark:bg-slate-900 transition-colors ${
+                  aria-label={slot.completed ? `Mark ${slot.activity} incomplete` : `Mark ${slot.activity} completed`}
+                  className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 bg-white dark:bg-slate-900 transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 ${
                     slot.completed
                       ? 'border-emerald-500 text-emerald-500'
                       : 'border-brand-500 text-brand-500'
                   }`}
-                  title="Mark slot done"
                 >
                   <div className={`w-2 h-2 rounded-full ${slot.completed ? 'bg-emerald-500' : 'bg-brand-500'}`} />
                 </button>
 
-                {/* Content Box */}
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/70 dark:border-slate-700/60 hover:border-brand-300 dark:hover:border-brand-600 transition space-y-2">
                   <div className="flex items-start justify-between">
                     <div>
@@ -417,9 +448,10 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => deleteScheduleItem(slot.id)}
-                      className="p-1 text-slate-300 hover:text-rose-500 rounded opacity-0 group-hover:opacity-100 transition"
-                      title="Delete slot"
+                      aria-label={`Delete ${slot.activity}`}
+                      className="p-1 text-slate-300 hover:text-rose-500 rounded opacity-0 group-hover:opacity-100 transition focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-500"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -453,19 +485,25 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
       {/* Add Milestone Modal */}
       {showAddMilestone && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-milestone-modal-title"
+        >
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+            <h3 id="add-milestone-modal-title" className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Plus className="w-5 h-5 text-brand-600" />
               <span>Add Planning Milestone</span>
             </h3>
 
             <form onSubmit={handleAddMilestone} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-milestone-title" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Milestone Task Title *
                 </label>
                 <input
+                  id="new-milestone-title"
                   type="text"
                   required
                   placeholder="e.g. Schedule Cake Tasting & Select Flavors"
@@ -476,10 +514,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-milestone-phase" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Planning Phase
                 </label>
                 <select
+                  id="new-milestone-phase"
                   value={newMilestonePhase}
                   onChange={(e) => setNewMilestonePhase(e.target.value as MilestonePhase)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
@@ -494,12 +533,13 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-milestone-priority" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Priority
                   </label>
                   <select
+                    id="new-milestone-priority"
                     value={newMilestonePriority}
-                    onChange={(e) => setNewMilestonePriority(e.target.value as any)}
+                    onChange={(e) => setNewMilestonePriority(e.target.value as 'high' | 'medium' | 'low')}
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
                   >
                     <option value="high">High</option>
@@ -508,10 +548,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-milestone-assignee" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Assigned Person
                   </label>
                   <input
+                    id="new-milestone-assignee"
                     type="text"
                     placeholder="e.g. Lead Planner"
                     value={newMilestoneAssignee}
@@ -522,10 +563,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-milestone-due-date" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Target Due Date
                 </label>
                 <input
+                  id="new-milestone-due-date"
                   type="date"
                   value={newMilestoneDueDate}
                   onChange={(e) => setNewMilestoneDueDate(e.target.value)}
@@ -537,13 +579,13 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddMilestone(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Save Milestone
                 </button>
@@ -555,9 +597,14 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
 
       {/* Add Day-of Schedule Modal */}
       {showAddSchedule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-schedule-modal-title"
+        >
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+            <h3 id="add-schedule-modal-title" className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Plus className="w-5 h-5 text-brand-600" />
               <span>Add Day-Of Schedule Slot</span>
             </h3>
@@ -565,10 +612,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
             <form onSubmit={handleAddSchedule} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-slot-time" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Start Time *
                   </label>
                   <input
+                    id="new-slot-time"
                     type="time"
                     required
                     value={newTime}
@@ -577,10 +625,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-slot-end-time" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     End Time
                   </label>
                   <input
+                    id="new-slot-end-time"
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
@@ -590,10 +639,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-slot-activity" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Activity Title *
                 </label>
                 <input
+                  id="new-slot-activity"
                   type="text"
                   required
                   placeholder="e.g. Sunset Golden Hour Couple Photos"
@@ -604,10 +654,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-slot-location" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Location
                 </label>
                 <input
+                  id="new-slot-location"
                   type="text"
                   placeholder="e.g. West Vineyard Lawn"
                   value={newLocation}
@@ -617,10 +668,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-slot-people" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Key People (comma-separated)
                 </label>
                 <input
+                  id="new-slot-people"
                   type="text"
                   placeholder="e.g. Elena, Julian, Lead Photographer"
                   value={newPeople}
@@ -630,10 +682,11 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-slot-notes" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Notes
                 </label>
                 <input
+                  id="new-slot-notes"
                   type="text"
                   placeholder="e.g. Golf cart reserved to ferry couple"
                   value={newNotes}
@@ -646,13 +699,13 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddSchedule(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Save Schedule Slot
                 </button>
@@ -664,4 +717,3 @@ export const TimelineManager: React.FC<TimelineManagerProps> = ({
     </div>
   );
 };
-

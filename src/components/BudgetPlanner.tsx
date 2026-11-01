@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+/**
+ * @file BudgetPlanner.tsx
+ * @description Smart interactive budget planner with real-time calculations,
+ * category distribution visualizations, and benchmarked AI rebalancing.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, 
   Plus, 
   Trash2, 
   CheckCircle2, 
-  AlertTriangle, 
   Sparkles, 
   Download, 
   Filter, 
-  Layers,
-  TrendingDown,
   PieChart
 } from 'lucide-react';
 import { FullEventPlan, BudgetItem, BudgetCategoryType, CURRENCY_MAP } from '../types/event';
 import { generateBudgetCsv, downloadFile } from '../services/export';
+import { sanitizeText } from '../utils/security';
 
 interface BudgetPlannerProps {
   plan: FullEventPlan;
@@ -40,13 +44,25 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
   const [newItemActual, setNewItemActual] = useState<number>(0);
   const [newItemNotes, setNewItemNotes] = useState('');
 
-  // Calculations
+  // Keyboard accessibility: Escape key to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddModal) setShowAddModal(false);
+        if (showAiRebalanceModal) setShowAiRebalanceModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAddModal, showAiRebalanceModal]);
+
+  // Financial calculations
   const totalBudget = details.totalBudget;
   const totalAllocated = budgetItems.reduce((acc, item) => acc + item.allocatedAmount, 0);
   const totalActual = budgetItems.reduce((acc, item) => acc + item.actualAmount, 0);
   const totalPaid = budgetItems.reduce((acc, item) => acc + item.paidAmount, 0);
   const remainingBudget = totalBudget - totalActual;
-  const contingencyItem = budgetItems.find(i => i.category === 'contingency');
+  const contingencyItem = budgetItems.find((i) => i.category === 'contingency');
   const contingencyAmount = contingencyItem ? contingencyItem.allocatedAmount : 0;
 
   // Filtered items
@@ -77,7 +93,7 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
     other: 'bg-orange-500',
   };
 
-  const handleUpdateItem = (id: string, field: keyof BudgetItem, value: any) => {
+  const handleUpdateItem = <K extends keyof BudgetItem>(id: string, field: K, value: BudgetItem[K]) => {
     const updatedItems = budgetItems.map((item) => {
       if (item.id === id) {
         return { ...item, [field]: value };
@@ -94,17 +110,18 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName.trim()) return;
+    const cleanName = sanitizeText(newItemName, 100);
+    if (!cleanName) return;
 
     const newItem: BudgetItem = {
       id: `budget-${Date.now()}`,
-      name: newItemName.trim(),
+      name: cleanName,
       category: newItemCategory,
-      allocatedAmount: Number(newItemAllocated) || 0,
-      actualAmount: Number(newItemActual) || 0,
+      allocatedAmount: Math.max(0, Number(newItemAllocated) || 0),
+      actualAmount: Math.max(0, Number(newItemActual) || 0),
       paidAmount: 0,
       isPaid: false,
-      notes: newItemNotes.trim(),
+      notes: sanitizeText(newItemNotes, 250),
     };
 
     onUpdatePlan({
@@ -140,24 +157,27 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={() => setShowAiRebalanceModal(true)}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 text-xs font-bold transition"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Sparkles className="w-3.5 h-3.5 text-brand-500" />
             <span>AI Rebalance</span>
           </button>
 
           <button
+            type="button"
             onClick={handleExportCsv}
-            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition"
+            className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md shadow-brand-500/20 transition focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Plus className="w-4 h-4" />
             <span>Add Expense</span>
@@ -214,7 +234,7 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
         </div>
       </div>
 
-      {/* Visual Multi-Segment Category Allocation Bar */}
+      {/* Category Allocation Distribution */}
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
         <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
           <div className="flex items-center space-x-1.5">
@@ -224,8 +244,7 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
           <span className="text-slate-400 font-normal">Based on allocated amounts</span>
         </div>
 
-        {/* Stacked bar */}
-        <div className="w-full h-3.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+        <div className="w-full h-3.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex" role="progressbar" aria-label="Category allocation progress">
           {Object.entries(categoryStats).map(([cat, stats]) => {
             const pct = (stats.allocated / totalBudget) * 100;
             if (pct <= 0) return null;
@@ -240,7 +259,6 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
           })}
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-[11px] text-slate-500">
           {Object.entries(categoryStats).map(([cat, stats]) => (
             <div key={cat} className="flex items-center space-x-1.5">
@@ -264,8 +282,9 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
           </div>
         </div>
         <button
+          type="button"
           onClick={() => onOpenCopilotWithPrompt(`Can you analyze my budget for ${details.title} and give me 3 specific ways to save money?`)}
-          className="text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center space-x-1 flex-shrink-0"
+          className="text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center space-x-1 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <span>Ask Copilot for more</span>
           <span>→</span>
@@ -279,8 +298,11 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Filter Category:</span>
+            <label htmlFor="category-filter-select" className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Filter Category:
+            </label>
             <select
+              id="category-filter-select"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -305,16 +327,16 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
         {/* Items Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs" aria-label="Budget Breakdown Table">
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="py-3 px-4">Item & Category</th>
-                <th className="py-3 px-4">Allocated</th>
-                <th className="py-3 px-4">Actual Cost</th>
-                <th className="py-3 px-4">Paid</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Notes</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th scope="col" className="py-3 px-4">Item & Category</th>
+                <th scope="col" className="py-3 px-4">Allocated</th>
+                <th scope="col" className="py-3 px-4">Actual Cost</th>
+                <th scope="col" className="py-3 px-4">Paid</th>
+                <th scope="col" className="py-3 px-4">Status</th>
+                <th scope="col" className="py-3 px-4">Notes</th>
+                <th scope="col" className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
@@ -327,59 +349,60 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
                     </span>
                   </td>
 
-                  {/* Allocated input */}
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-1">
                       <span className="text-slate-400">{currency.symbol}</span>
                       <input
                         type="number"
                         min="0"
+                        aria-label={`Allocated amount for ${item.name}`}
                         value={item.allocatedAmount}
-                        onChange={(e) => handleUpdateItem(item.id, 'allocatedAmount', Number(e.target.value) || 0)}
-                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white"
+                        onChange={(e) => handleUpdateItem(item.id, 'allocatedAmount', Math.max(0, Number(e.target.value) || 0))}
+                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white focus-visible:ring-2 focus-visible:ring-brand-500"
                       />
                     </div>
                   </td>
 
-                  {/* Actual input */}
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-1">
                       <span className="text-slate-400">{currency.symbol}</span>
                       <input
                         type="number"
                         min="0"
+                        aria-label={`Actual cost for ${item.name}`}
                         value={item.actualAmount}
-                        onChange={(e) => handleUpdateItem(item.id, 'actualAmount', Number(e.target.value) || 0)}
-                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white"
+                        onChange={(e) => handleUpdateItem(item.id, 'actualAmount', Math.max(0, Number(e.target.value) || 0))}
+                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white focus-visible:ring-2 focus-visible:ring-brand-500"
                       />
                     </div>
                   </td>
 
-                  {/* Paid input */}
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-1">
                       <span className="text-slate-400">{currency.symbol}</span>
                       <input
                         type="number"
                         min="0"
+                        aria-label={`Paid amount for ${item.name}`}
                         value={item.paidAmount}
                         onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
+                          const val = Math.max(0, Number(e.target.value) || 0);
                           handleUpdateItem(item.id, 'paidAmount', val);
                           if (val >= item.actualAmount && item.actualAmount > 0) {
                             handleUpdateItem(item.id, 'isPaid', true);
                           }
                         }}
-                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white"
+                        className="w-20 px-1.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium text-slate-900 dark:text-white focus-visible:ring-2 focus-visible:ring-brand-500"
                       />
                     </div>
                   </td>
 
-                  {/* Paid status toggle */}
                   <td className="py-3 px-4">
                     <button
+                      type="button"
+                      aria-label={item.isPaid ? 'Mark as pending payment' : 'Mark as fully paid'}
                       onClick={() => handleUpdateItem(item.id, 'isPaid', !item.isPaid)}
-                      className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
+                      className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                         item.isPaid
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                           : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
@@ -390,23 +413,23 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
                     </button>
                   </td>
 
-                  {/* Notes */}
                   <td className="py-3 px-4 max-w-[180px]">
                     <input
                       type="text"
                       value={item.notes || ''}
                       placeholder="Add note..."
+                      aria-label={`Notes for ${item.name}`}
                       onChange={(e) => handleUpdateItem(item.id, 'notes', e.target.value)}
-                      className="w-full text-xs text-slate-600 dark:text-slate-300 bg-transparent hover:border-b border-slate-300 dark:border-slate-600 focus:outline-none"
+                      className="w-full text-xs text-slate-600 dark:text-slate-300 bg-transparent hover:border-b border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </td>
 
-                  {/* Delete button */}
                   <td className="py-3 px-4 text-right">
                     <button
+                      type="button"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
-                      title="Delete item"
+                      aria-label={`Delete ${item.name}`}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition focus-visible:ring-2 focus-visible:ring-rose-500"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -420,19 +443,25 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
       {/* Add Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-budget-modal-title"
+        >
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+            <h3 id="add-budget-modal-title" className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
               <Plus className="w-5 h-5 text-brand-600" />
               <span>Add Budget Expense</span>
             </h3>
 
             <form onSubmit={handleAddItem} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-item-name" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Item / Service Name *
                 </label>
                 <input
+                  id="new-item-name"
                   type="text"
                   required
                   placeholder="e.g. Wedding Cake & Dessert Station"
@@ -443,10 +472,11 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-item-category" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Category
                 </label>
                 <select
+                  id="new-item-category"
                   value={newItemCategory}
                   onChange={(e) => setNewItemCategory(e.target.value as BudgetCategoryType)}
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
@@ -465,10 +495,11 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-item-allocated" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Allocated Target ({currency.symbol})
                   </label>
                   <input
+                    id="new-item-allocated"
                     type="number"
                     min="0"
                     value={newItemAllocated}
@@ -477,10 +508,11 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="new-item-actual" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Actual Quote ({currency.symbol})
                   </label>
                   <input
+                    id="new-item-actual"
                     type="number"
                     min="0"
                     value={newItemActual}
@@ -491,10 +523,11 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label htmlFor="new-item-notes" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Notes
                 </label>
                 <input
+                  id="new-item-notes"
                   type="text"
                   placeholder="e.g. Deposit due 60 days before event"
                   value={newItemNotes}
@@ -507,13 +540,13 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   Save Item
                 </button>
@@ -525,11 +558,16 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
 
       {/* AI Rebalance Modal */}
       {showAiRebalanceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ai-rebalance-modal-title"
+        >
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
             <div className="flex items-center space-x-2 text-brand-600 mb-3">
               <Sparkles className="w-5 h-5" />
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <h3 id="ai-rebalance-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
                 Gatherly AI Budget Optimizer
               </h3>
             </div>
@@ -569,14 +607,13 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAiRebalanceModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 Close
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  // Apply optimized allocated proportions
                   const updated = budgetItems.map((item) => {
                     if (item.category === 'venue') return { ...item, allocatedAmount: Math.round(totalBudget * 0.35) };
                     if (item.category === 'catering') return { ...item, allocatedAmount: Math.round(totalBudget * 0.30) };
@@ -589,7 +626,7 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
                   onUpdatePlan({ ...plan, budgetItems: updated });
                   setShowAiRebalanceModal(false);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white transition shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 Apply Proportions
               </button>
@@ -600,4 +637,3 @@ export const BudgetPlanner: React.FC<BudgetPlannerProps> = ({
     </div>
   );
 };
-

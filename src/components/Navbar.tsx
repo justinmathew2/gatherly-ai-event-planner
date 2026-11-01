@@ -1,4 +1,10 @@
-import React from 'react';
+/**
+ * @file Navbar.tsx
+ * @description Accessible header navigation supporting celebration switcher,
+ * tab routing, AI copilot toggling, and dark mode controls.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   Calendar, 
@@ -43,20 +49,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   isChatOpen,
   setIsChatOpen,
 }) => {
-  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Close dropdown on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dropdownOpen) {
+        setDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dropdownOpen]);
 
   const getEventIcon = (type: EventType) => {
     switch (type) {
       case 'wedding':
-        return <Heart className="w-4 h-4 text-rose-500" />;
+        return <Heart className="w-4 h-4 text-rose-500" aria-hidden="true" />;
       case 'birthday':
-        return <Cake className="w-4 h-4 text-amber-500" />;
+        return <Cake className="w-4 h-4 text-amber-500" aria-hidden="true" />;
       case 'community':
-        return <Users className="w-4 h-4 text-emerald-500" />;
+        return <Users className="w-4 h-4 text-emerald-500" aria-hidden="true" />;
       case 'corporate':
-        return <Building className="w-4 h-4 text-indigo-500" />;
+        return <Building className="w-4 h-4 text-indigo-500" aria-hidden="true" />;
       default:
-        return <PartyPopper className="w-4 h-4 text-brand-500" />;
+        return <PartyPopper className="w-4 h-4 text-brand-500" aria-hidden="true" />;
     }
   };
 
@@ -77,7 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-rose-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
-                <Sparkles className="w-5 h-5 animate-pulse-subtle" />
+                <Sparkles className="w-5 h-5 animate-pulse-subtle" aria-hidden="true" />
               </div>
               <div>
                 <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-brand-600 via-rose-500 to-amber-500 bg-clip-text text-transparent">
@@ -96,21 +113,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center space-x-2 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-slate-700 transition"
+                className="flex items-center space-x-2 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 px-3 py-1.5 rounded-lg border border-slate-200/60 dark:border-slate-700 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                 aria-expanded={dropdownOpen}
                 aria-haspopup="true"
+                aria-label={`Current celebration: ${activeEvent.details.title}. Click to switch celebration.`}
               >
                 {getEventIcon(activeEvent.details.eventType)}
                 <span className="max-w-[150px] sm:max-w-[220px] truncate">
                   {activeEvent.details.title}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
               </button>
 
               {dropdownOpen && (
                 <div 
                   className="absolute left-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-50 animate-fade-in"
                   role="menu"
+                  aria-label="Celebrations List"
                 >
                   <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Your Celebrations
@@ -118,11 +137,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {allEvents.map((evt) => (
                     <button
                       key={evt.details.id}
+                      type="button"
                       onClick={() => {
                         onSelectEvent(evt.details.id);
                         setDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition ${
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                         evt.details.id === activeEvent.details.id
                           ? 'bg-brand-50/60 dark:bg-brand-950/30 font-semibold text-brand-600 dark:text-brand-400'
                           : 'text-slate-700 dark:text-slate-200'
@@ -141,11 +161,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
                   <button
+                    type="button"
                     onClick={() => {
                       onOpenCreateWizard();
                       setDropdownOpen(false);
                     }}
-                    className="w-full flex items-center space-x-2 px-3 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/50 transition"
+                    className="w-full flex items-center space-x-2 px-3 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/50 transition focus-visible:ring-2 focus-visible:ring-brand-500"
                     role="menuitem"
                   >
                     <PlusCircle className="w-4 h-4" />
@@ -157,23 +178,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Navigation Tabs (Desktop) */}
-          <nav className="hidden md:flex items-center space-x-1" role="tablist">
+          <nav className="hidden md:flex items-center space-x-1" role="tablist" aria-label="Main Navigation">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
+                  type="button"
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-brand-500 ${
                     isActive
                       ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400 shadow-sm'
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`} aria-hidden="true" />
                   <span>{item.label}</span>
                 </button>
               );
@@ -183,8 +205,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Top Right Action Buttons */}
           <div className="flex items-center space-x-2">
             <button
+              type="button"
               onClick={() => setIsChatOpen(!isChatOpen)}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 isChatOpen
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20'
                   : 'bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800 hover:bg-brand-100'
@@ -197,19 +220,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={onOpenExport}
-              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition focus-visible:ring-2 focus-visible:ring-brand-500"
               title="Export & Share Plan"
-              aria-label="Export Plan"
+              aria-label="Export and Share Event Plan"
             >
               <Download className="w-4 h-4" />
             </button>
 
             <button
+              type="button"
               onClick={onOpenSettings}
-              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition focus-visible:ring-2 focus-visible:ring-brand-500"
               title="Configure Settings & API Key"
-              aria-label="Configure Settings"
+              aria-label="Configure Application Settings and API Key"
             >
               <SettingsIcon className="w-4 h-4" />
             </button>
@@ -219,27 +244,27 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Mobile Tab Navigation Bar */}
-      <div className="md:hidden border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex justify-around bg-slate-50/70 dark:bg-slate-950/70">
+      <nav className="md:hidden border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex justify-around bg-slate-50/70 dark:bg-slate-950/70" aria-label="Mobile Navigation">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center py-1 px-2 text-[10px] font-medium rounded-lg ${
+              className={`flex flex-col items-center py-1 px-2 text-[10px] font-medium rounded-lg focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 isActive
                   ? 'text-brand-600 dark:text-brand-400 font-semibold'
                   : 'text-slate-500 dark:text-slate-400'
               }`}
             >
-              <Icon className="w-4 h-4 mb-0.5" />
+              <Icon className="w-4 h-4 mb-0.5" aria-hidden="true" />
               <span>{item.label.split(' ')[0]}</span>
             </button>
           );
         })}
-      </div>
+      </nav>
     </header>
   );
 };
-
