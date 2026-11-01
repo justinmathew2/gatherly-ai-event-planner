@@ -22,7 +22,7 @@ import {
 import { FullEventPlan, Vendor, VendorCategory, VendorStatus, CURRENCY_MAP } from '../types/event';
 import { generateVendorInquiryEmail, generateVendorQuestions } from '../services/gemini';
 import { generateVendorsCsv, downloadFile } from '../services/export';
-import { sanitizeText, sanitizeUrl } from '../utils/security';
+import { sanitizeText } from '../utils/security';
 
 interface VendorChecklistProps {
   plan: FullEventPlan;

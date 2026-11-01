@@ -36,7 +36,7 @@ export const extractJsonFromResponse = (text: string): unknown => {
     if (match && match[1]) {
       try {
         return JSON.parse(match[1]);
-      } catch (innerErr) {
+      } catch {
         // Continue to fallback
       }
     }
@@ -60,9 +60,12 @@ export interface GenerateEventPlanInput {
   totalBudget: number;
   currency: string;
   vibe: string;
-  primaryPriorities: string[];
-  dietaryRestrictions: string[];
-  accessibilityNeeds: string[];
+  primaryPriorities?: string[];
+  dietaryRestrictions?: string[];
+  accessibilityNeeds?: string[];
+  startTime?: string;
+  endTime?: string;
+  mustHaves?: string;
 }
 
 /**
@@ -83,13 +86,16 @@ export const generateEventPlanWithAI = async (
     totalBudget: Math.max(0, Math.min(100000000, Number(rawInput.totalBudget) || 10000)),
     currency: sanitizeText(rawInput.currency, 5),
     vibe: sanitizeText(rawInput.vibe, 200),
-    primaryPriorities: rawInput.primaryPriorities.map((p) => sanitizeText(p, 80)),
-    dietaryRestrictions: rawInput.dietaryRestrictions.map((d) => sanitizeText(d, 60)),
-    accessibilityNeeds: rawInput.accessibilityNeeds.map((a) => sanitizeText(a, 60)),
+    primaryPriorities: (rawInput.primaryPriorities || []).map((p) => sanitizeText(p, 80)),
+    dietaryRestrictions: (rawInput.dietaryRestrictions || []).map((d) => sanitizeText(d, 60)),
+    accessibilityNeeds: (rawInput.accessibilityNeeds || []).map((a) => sanitizeText(a, 60)),
+    startTime: rawInput.startTime || '12:00',
+    endTime: rawInput.endTime || '18:00',
+    mustHaves: rawInput.mustHaves ? sanitizeText(rawInput.mustHaves, 300) : undefined,
   };
 
   const settings = getStoredSettings();
-  const apiKey = apiKeyOverride || settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  const apiKey = apiKeyOverride || settings.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
   if (!apiKey || apiKey.trim() === '') {
     return generateOfflineEventPlan(input);
@@ -115,7 +121,7 @@ Ensure:
 2. Timeline milestones span from 6-12 months out down to the day before.
 3. Day-of schedule provides an hour-by-hour run of show with realistic timings in HH:MM format.
 4. Vendors have realistic price estimates, categories, and practical roles.
-5. Personalized ideas include aesthetic color palette with valid hex codes (#RRGGBB), unique decor concepts, multi-course menu suggestions accommodating dietary restrictions (${input.dietaryRestrictions.join(', ') || 'Standard'}), custom invitation copies in 3 tones, interactive activities, and cost-saving hacks.
+5. Personalized ideas include aesthetic color palette with valid hex codes (#RRGGBB), unique decor concepts, multi-course menu suggestions accommodating dietary restrictions (${input.dietaryRestrictions?.join(', ') || 'Standard'}), custom invitation copies in 3 tones, interactive activities, and cost-saving hacks.
 
 Output schema:
 {
@@ -227,9 +233,9 @@ Location: ${input.location}
 Guest Count: ${input.guestCount}
 Total Budget: ${input.currency} ${input.totalBudget}
 Aesthetic Vibe: ${input.vibe}
-Top Priorities: ${input.primaryPriorities.join(', ')}
-Dietary Restrictions: ${input.dietaryRestrictions.join(', ') || 'None specified'}
-Accessibility Considerations: ${input.accessibilityNeeds.join(', ') || 'Standard accessibility'}
+Top Priorities: ${input.primaryPriorities?.join(', ') || 'Memorable experience'}
+Dietary Restrictions: ${input.dietaryRestrictions?.join(', ') || 'None specified'}
+Accessibility Considerations: ${input.accessibilityNeeds?.join(', ') || 'Standard accessibility'}
 
 Generate the full JSON now.`;
 
@@ -259,7 +265,7 @@ Generate the full JSON now.`;
     } else {
       return generateOfflineEventPlan(input, parsedData as Partial<FullEventPlan>);
     }
-  } catch (error) {
+  } catch {
     return generateOfflineEventPlan(input);
   }
 };
@@ -269,10 +275,26 @@ Generate the full JSON now.`;
  * realistic plans tailored to custom inputs without network latency.
  */
 export const generateOfflineEventPlan = (
-  input: GenerateEventPlanInput,
+  rawInput: GenerateEventPlanInput,
   partial?: Partial<FullEventPlan>
 ): FullEventPlan => {
-  const budget = Math.max(500, input.totalBudget);
+  const input: GenerateEventPlanInput = {
+    title: sanitizeText(rawInput.title, 120),
+    eventType: rawInput.eventType,
+    date: rawInput.date,
+    startTime: rawInput.startTime || '12:00',
+    endTime: rawInput.endTime || '18:00',
+    location: sanitizeText(rawInput.location, 150),
+    guestCount: Math.max(1, rawInput.guestCount || 50),
+    totalBudget: typeof rawInput.totalBudget === 'number' && rawInput.totalBudget >= 0 ? rawInput.totalBudget : 5000,
+    currency: rawInput.currency || 'USD',
+    vibe: sanitizeText(rawInput.vibe, 200),
+    mustHaves: rawInput.mustHaves ? sanitizeText(rawInput.mustHaves, 300) : undefined,
+    dietaryRestrictions: (rawInput.dietaryRestrictions || []).map((d) => sanitizeText(d, 60)),
+    primaryPriorities: (rawInput.primaryPriorities || []).map((p) => sanitizeText(p, 80)),
+  };
+
+  const budget = input.totalBudget > 0 ? input.totalBudget : 500;
   const isWedding = input.eventType === 'wedding';
   const isBirthday = input.eventType === 'birthday';
   const isCommunity = input.eventType === 'community';
@@ -304,7 +326,7 @@ export const generateOfflineEventPlan = (
       actualAmount: Math.round(budget * cateringPct),
       paidAmount: Math.round(budget * cateringPct * 0.3),
       isPaid: false,
-      notes: `Includes dietary accommodations (${input.dietaryRestrictions.join(', ') || 'standard allergen labeling'})`,
+      notes: `Includes dietary accommodations (${input.dietaryRestrictions?.join(', ') || 'standard allergen labeling'})`,
     },
     {
       id: 'b-photo',
@@ -472,7 +494,7 @@ export const generateOfflineEventPlan = (
 
   const ideas: PersonalizedIdeas = {
     themeName: `${input.vibe} Celebration`,
-    tagline: `An unforgettable gathering designed around ${input.primaryPriorities[0] || 'community and joy'}.`,
+    tagline: `An unforgettable gathering designed around ${input.primaryPriorities?.[0] || 'community and joy'}.`,
     palette: [
       { name: 'Rose Gold Shimmer', hex: '#E0A899', role: 'Primary Elegant Accent' },
       { name: 'Midnight Navy', hex: '#1E293B', role: 'Deep Contrast Foundation' },
@@ -559,9 +581,9 @@ export const generateOfflineEventPlan = (
       currency: (input.currency as CurrencyCode) || 'USD',
       vibe: input.vibe,
       themeDescription: `A masterfully planned ${input.eventType} celebration at ${input.location} for ${input.guestCount} guests.`,
-      primaryPriorities: input.primaryPriorities,
-      dietaryRestrictions: input.dietaryRestrictions,
-      accessibilityNeeds: input.accessibilityNeeds,
+      primaryPriorities: input.primaryPriorities || [],
+      dietaryRestrictions: input.dietaryRestrictions || [],
+      accessibilityNeeds: input.accessibilityNeeds || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -592,7 +614,7 @@ export const generateVendorInquiryEmail = async (
   const sanitizedContact = sanitizeText(vendor.contactPerson || '', 80);
 
   const settings = getStoredSettings();
-  const apiKey = settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  const apiKey = settings.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
   if (apiKey) {
     try {
@@ -647,7 +669,7 @@ export const generateVendorQuestions = async (
   plan: FullEventPlan
 ): Promise<string[]> => {
   const settings = getStoredSettings();
-  const apiKey = settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  const apiKey = settings.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
   if (apiKey) {
     try {
@@ -713,7 +735,7 @@ export const queryAssistantCopilot = async (
 ): Promise<{ reply: string }> => {
   const message = sanitizeText(rawMessage, 500);
   const settings = getStoredSettings();
-  const apiKey = settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  const apiKey = settings.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
 
   if (apiKey) {
     try {
@@ -727,7 +749,7 @@ Current Event Context:
 - Guest count: ${plan.details.guestCount}
 - Budget: ${plan.details.currency} ${plan.details.totalBudget}
 - Spent/Committed: ${plan.budgetItems.reduce((acc, i) => acc + i.actualAmount, 0)}
-- Priorities: ${plan.details.primaryPriorities.join(', ')}
+- Priorities: ${plan.details.primaryPriorities?.join(', ') || 'None'}
 - Vibe: ${plan.details.vibe}
 
 User query: "${message}"

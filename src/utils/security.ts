@@ -6,11 +6,12 @@
 
 // Regex patterns for potential prompt injection vectors
 const PROMPT_INJECTION_PATTERNS = [
-  /ignore\s+(all\s+)?(previous|prior)\s+(instructions|prompts|rules)/gi,
+  /ignore\s+(all\s+)?(previous|prior|system)\s+(instructions|prompts|rules)/gi,
   /system\s*:\s*/gi,
+  /system\s+prompt\s+override/gi,
   /you\s+are\s+now\s+(unrestricted|DAN|jailbroken)/gi,
   /disregard\s+(the\s+)?above/gi,
-  /reveal\s+(the\s+)?(hidden|system)\s+(prompt|instructions)/gi,
+  /reveal\s+(the\s+)?(secret|hidden|system)\s+(keys?|prompt|instructions)/gi,
   /override\s+(all\s+)?security\s+rules/gi,
 ];
 

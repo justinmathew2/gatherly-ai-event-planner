@@ -8,9 +8,7 @@ import {
   Copy, 
   Check, 
   GlassWater, 
-  Smile, 
-  Zap, 
-  Flame
+  Smile
 } from 'lucide-react';
 import { FullEventPlan, ColorPaletteItem } from '../types/event';
 
@@ -67,27 +65,32 @@ export const IdeationStudio: React.FC<IdeationStudioProps> = ({
       </div>
 
       {/* Navigation Pills */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-        {[
-          { id: 'theme', label: 'Theme & Palette', icon: Palette },
-          { id: 'invitations', label: 'Invitations & RSVP', icon: Mail },
-          { id: 'menu', label: 'Catering & Cocktails', icon: Utensils },
-          { id: 'activities', label: 'Activities & Flow', icon: Smile },
-          { id: 'music', label: 'Music & Playlists', icon: Music },
-        ].map((tab) => {
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3" role="tablist" aria-label="Ideation categories">
+        {(
+          [
+            { id: 'theme' as const, label: 'Theme & Palette', icon: Palette },
+            { id: 'invitations' as const, label: 'Invitations & RSVP', icon: Mail },
+            { id: 'menu' as const, label: 'Catering & Cocktails', icon: Utensils },
+            { id: 'activities' as const, label: 'Activities & Flow', icon: Smile },
+            { id: 'music' as const, label: 'Music & Playlists', icon: Music },
+          ]
+        ).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeCategory === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveCategory(tab.id as any)}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveCategory(tab.id)}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 isActive
                   ? 'bg-brand-600 text-white shadow-sm'
                   : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4" aria-hidden="true" />
               <span>{tab.label}</span>
             </button>
           );

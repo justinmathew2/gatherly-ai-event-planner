@@ -157,3 +157,57 @@ export const deleteSingleEvent = (id: string): FullEventPlan[] => {
     return SAMPLE_EVENTS;
   }
 };
+
+/**
+ * Serializes all persisted events and user settings into an exportable backup JSON string.
+ */
+export const exportAllDataBackup = (): string => {
+  const events = getStoredEvents();
+  const settings = getStoredSettings();
+  const payload = {
+    version: '1.0',
+    exportDate: new Date().toISOString(),
+    events,
+    settings,
+  };
+  return JSON.stringify(payload, null, 2);
+};
+
+/**
+ * Validates and restores a complete data backup payload into localStorage.
+ * Returns true if restored successfully, false otherwise.
+ */
+export const importDataBackup = (rawJson: string): boolean => {
+  try {
+    const parsed = JSON.parse(rawJson);
+    if (!parsed || !Array.isArray(parsed.events) || parsed.events.length === 0) {
+      return false;
+    }
+
+    const validatedEvents: FullEventPlan[] = [];
+    for (const item of parsed.events) {
+      const val = FullEventPlanSchema.safeParse(item);
+      if (val.success) {
+        validatedEvents.push(val.data as FullEventPlan);
+      }
+    }
+
+    if (validatedEvents.length === 0) {
+      return false;
+    }
+
+    saveStoredEvents(validatedEvents);
+    setActiveEventId(validatedEvents[0].details.id);
+
+    if (parsed.settings && typeof parsed.settings === 'object') {
+      saveStoredSettings({
+        ...DEFAULT_SETTINGS,
+        ...parsed.settings,
+      });
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+};

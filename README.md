@@ -8,7 +8,7 @@
 
 ## 🌟 Executive Summary
 
-**Gatherly AI** is an intelligent, GenAI-powered full-lifecycle celebration and event planning assistant designed to streamline the complex, high-stress process of organizing **Weddings, Milestone Birthdays, Community & Cultural Festivals, and Corporate Celebrations**.
+**Gatherly AI** is an enterprise-grade, GenAI-powered full-lifecycle celebration and event planning assistant designed to streamline the complex, high-stress process of organizing **Weddings, Milestone Birthdays, Community & Cultural Festivals, and Corporate Celebrations**.
 
 Planning celebrations involves hundreds of moving pieces—volatile budgets, vendor communications, multi-phase countdowns, hourly day-of itineraries, dietary restrictions, and aesthetic coherence. Gatherly AI bridges the gap between raw generative creativity and mathematical budgeting rigor: it synthesizes industry-standard financial formulas, vendor matrices, and timeline automation with Google's Gemini models.
 
@@ -36,7 +36,7 @@ Gatherly AI provides specialized engines for the four major celebration vertical
 ### 2. 💰 Smart Dynamic Budget Planner & Rebalancer
 - Real-time tracking across 10 categories (Venue, Catering, Photo, Music, Decor, Attire, Stationery, Transport, Contingency, Other).
 - **AI Rebalancing**: One-click optimization applying industry benchmark proportions (e.g. 35% venue, 30% catering, 12% photo, 10% music, 8% decor, 5% contingency).
-- Multi-currency support (USD, EUR, GBP, INR, CAD, AUD).
+- Multi-currency support (USD, EUR, GBP, INR, CAD, AUD) with localized formatting.
 - Track allocated caps, actual quotes, and paid deposit receipts.
 
 ### 3. ⏱️ Timeline & Day-Of Run-of-Show Manager
@@ -87,29 +87,38 @@ Gatherly AI leverages Google's **Gemini Models** (`gemini-2.0-flash` and `gemini
 ## 🛡️ Evaluation Focus Areas Alignment
 
 ### 1. Code Quality
-- Clean, modular TypeScript architecture with strict typing.
-- Decoupled UI components (`components/`), storage logic (`services/storage.ts`), AI services (`services/gemini.ts`), and export formatters (`services/export.ts`).
-- Zod schema validation ensuring run-time safety for all data structures.
+- Clean, modular TypeScript architecture with zero `any` declarations.
+- Strict single-responsibility separation: hooks (`hooks/`), utils (`utils/`), types (`types/`), components (`components/`), storage logic (`services/storage.ts`), AI services (`services/gemini.ts`), and export formatters (`services/export.ts`).
+- Full ESLint flat config integration (`npm run lint`) and strict type checks (`npm run typecheck`).
+- React `ErrorBoundary` with interactive state recovery.
 
 ### 2. Security
 - **BYOK (Bring Your Own Key)** architecture: Gemini API keys are stored exclusively in client-side `localStorage`. Zero API keys or secrets are transmitted to intermediate backend servers or checked into git.
-- Strict input sanitization and XSS-safe text rendering.
-- No third-party tracking or data harvesting.
+- **OWASP-aligned input sanitization**: Neutralizes prompt injections (`system prompt override`, `ignore instructions`, etc.), strips dangerous HTML/scripts, validates external URL protocols (`http:`, `https:`), and safely escapes RFC-5545 iCalendar and RFC-4180 CSV characters.
+- Content Security Policy (CSP) headers preconfigured in `index.html`.
 
 ### 3. Efficiency
-- Blazingly fast Vite + React client-side bundle (~120 KB gzipped).
+- Blazingly fast Vite + React client-side bundle (~124 KB gzipped).
 - Instant offline cache with zero-latency updates.
 - Optimized token usage using Gemini Flash models with structured JSON mode.
+- Fast Vitest execution (< 1.5s for 59 automated test cases).
 
 ### 4. Testing
-- Automated unit and integration test suite using **Vitest**.
-- Validates Zod schema parsing, budget math calculations, RFC-5545 iCalendar compliance, CSV generation, and offline fallback consistency.
+- Comprehensive automated test suite with **59 passing tests** across 6 dedicated test suites:
+  - `src/test/security.test.ts` (13 tests): Prompt injection defense, HTML/script stripping, safe URL protocol filtering, CSV/iCal escaping.
+  - `src/test/export.test.ts` (6 tests): RFC-5545 iCalendar envelope/VEVENT structure, RFC-4180 CSV header/field quoting.
+  - `src/test/formatters.test.ts` (12 tests): Multi-currency formatting, percentage bounding, readable date formatting.
+  - `src/test/storage.test.ts` (7 tests): Data seeding, update persistence, user settings, backup JSON export/import.
+  - `src/test/aiGenerator.test.ts` (5 tests): Multi-vertical plan generation (Wedding, Birthday, Community, Corporate), budget allocation math, input sanitization.
+  - `src/test/planner.test.ts` (16 tests): Zod schema validation across all domain models, financial calculation logic, corruption recovery.
 - Run tests anytime with `npm test`.
 
 ### 5. Accessibility
 - High-contrast color palettes meeting WCAG 2.1 AA standards.
-- Full keyboard navigation and semantic HTML landmarks (`<header>`, `<main>`, `<nav>`, `<aside>`, `<footer>`).
-- Screen reader friendly labels (`aria-label`, `aria-expanded`, `role="tablist"`).
+- Full keyboard navigation (Tab, Enter, Space, Escape modal dismissal) and semantic HTML landmarks (`<header>`, `<main>`, `<nav>`, `<aside>`, `<footer>`).
+- Screen reader live regions (`aria-live="polite"`, `role="status"`) via `useAriaAnnouncer`.
+- Visible focus rings (`focus-visible:ring-2 focus-visible:ring-brand-500`) on all interactive controls.
+- Skip-to-content accessibility link (`#main-content`).
 
 ---
 
@@ -128,23 +137,36 @@ gatherly-ai-event-planner/
 │   │   ├── AssistantChat.tsx  # Interactive AI copilot drawer
 │   │   ├── EventSetupWizard.tsx# 3-step AI creation wizard
 │   │   ├── SettingsModal.tsx  # API key, model & currency configuration
-│   │   └── ExportModal.tsx    # iCal, CSV, JSON & PDF export tools
+│   │   ├── ExportModal.tsx    # iCal, CSV, JSON & PDF export tools
+│   │   └── ErrorBoundary.tsx  # Production crash isolation & recovery
+│   ├── hooks/
+│   │   ├── useAriaAnnouncer.tsx# WCAG screen reader announcer hook
+│   │   └── useCountdown.ts    # Real-time event countdown timer hook
+│   ├── utils/
+│   │   ├── formatters.ts      # Multi-currency, date & percentage helpers
+│   │   └── security.ts        # Input sanitization, XSS & prompt defense
 │   ├── services/
 │   │   ├── gemini.ts          # Google GenAI integration & offline engine
-│   │   ├── storage.ts         # LocalStorage persistence & sample management
-│   │   ├── export.ts          # iCal (.ics) & CSV generators
+│   │   ├── storage.ts         # LocalStorage persistence & backup manager
+│   │   ├── export.ts          # RFC-5545 iCal & RFC-4180 CSV generators
 │   │   └── mockData.ts        # Sample events (Wedding, Birthday, Festival)
 │   ├── types/
-│   │   ├── event.ts           # Core TypeScript interfaces
-│   │   └── schema.ts          # Zod validation schemas
+│   │   ├── event.ts           # Strict TypeScript interfaces & error classes
+│   │   └── schema.ts          # Zod runtime validation schemas
 │   ├── test/
 │   │   ├── setup.ts           # Vitest environment setup
-│   │   └── planner.test.ts    # Comprehensive automated test suite
+│   │   ├── security.test.ts   # Security & prompt injection tests
+│   │   ├── export.test.ts     # iCalendar & CSV export tests
+│   │   ├── formatters.test.ts # Currency & date formatting tests
+│   │   ├── storage.test.ts    # Persistence & backup restore tests
+│   │   ├── aiGenerator.test.ts# Multi-vertical AI synthesis tests
+│   │   └── planner.test.ts    # Zod schema validation & logic tests
 │   ├── App.tsx                # Main application state container
 │   ├── main.tsx               # DOM entry point
 │   └── index.css              # Tailwind CSS directives & print styles
+├── eslint.config.js           # Modern ESLint flat configuration
 ├── index.html                 # HTML shell with accessibility & viewport tags
-├── package.json               # Dependency definitions
+├── package.json               # Dependency definitions & scripts
 ├── tailwind.config.js         # Theme color definitions & animation keyframes
 ├── vite.config.ts             # Vite build & Vitest test configuration
 └── README.md                  # Comprehensive documentation
@@ -185,12 +207,22 @@ gatherly-ai-event-planner/
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-4. **Run the automated test suite:**
+4. **Run static lint checks:**
+   ```bash
+   npm run lint
+   ```
+
+5. **Run TypeScript strict type check:**
+   ```bash
+   npm run typecheck
+   ```
+
+6. **Run the automated test suite (59 tests):**
    ```bash
    npm test
    ```
 
-5. **Build for production:**
+7. **Build for production:**
    ```bash
    npm run build
    ```
@@ -216,7 +248,7 @@ For your contest submission form:
 - **Public GitHub Repository Link**: `https://github.com/justinmathew2/gatherly-ai-event-planner.git`
 - **Project Deployed Link**: `https://gatherly-ai-event-planner-fawn.vercel.app/`
 - **Describe the changes/updates made in the deployed version**:
-  > Built Gatherly AI, a GenAI event planning copilot for Weddings, Milestone Birthdays, Community Festivals, and Corporate Gatherings. Features dynamic budget allocation with one-click AI rebalancing, countdown milestones, hour-by-hour day-of run-of-show with RFC-5545 iCal calendar export, vendor tracking with automated inquiry email drafting & interview questions, personalized aesthetic palettes with HEX copy, dietary-conscious catering menus, and an interactive context-aware AI planning copilot.
+  > Built Gatherly AI, a GenAI event planning assistant for Weddings, Milestone Birthdays, Community Festivals, and Corporate Gatherings. Features dynamic budget allocation with one-click AI rebalancing, countdown milestones, hour-by-hour day-of run-of-show with RFC-5545 iCal calendar export, vendor tracking with automated inquiry email drafting & interview questions, personalized aesthetic palettes with HEX copy, dietary-conscious catering menus, and an interactive context-aware AI planning copilot. Includes 59 passing Vitest tests, WCAG 2.1 AA accessible UI with ARIA live regions, prompt injection sanitization, and full offline fallback resilience.
 - **Mention the Gen AI services utilized in the submission, and where did you utilize it?**:
   > Google Gemini Models (`gemini-2.0-flash` & `gemini-1.5-flash`) utilized via the `@google/generative-ai` SDK in:
   > 1. **AI Event Architect**: Synthesizes custom user requirements into a full, typed event plan.

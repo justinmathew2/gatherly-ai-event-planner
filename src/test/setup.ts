@@ -1,9 +1,9 @@
 /**
  * @file setup.ts
- * @description Vitest test environment initialization with localStorage mock.
+ * @description Vitest test environment initialization with typed localStorage mock.
  */
 
-class LocalStorageMock {
+class LocalStorageMock implements Storage {
   private store: Record<string, string> = {};
 
   public clear(): void {
@@ -32,5 +32,8 @@ class LocalStorageMock {
   }
 }
 
-// Assign to globalThis
-(globalThis as any).localStorage = new LocalStorageMock();
+// Assign mock to globalThis
+Object.defineProperty(globalThis, 'localStorage', {
+  value: new LocalStorageMock(),
+  writable: true,
+});
