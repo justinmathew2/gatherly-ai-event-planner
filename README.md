@@ -1,5 +1,6 @@
 # Gatherly AI — Autonomous Celebration & Event Planner
 > **Submission for [Challenge 5] Celebration & Event Planner**  
+> **🌐 Live Deployed Application:** [https://gatherly-ai-event-planner-fawn.vercel.app/](https://gatherly-ai-event-planner-fawn.vercel.app/)  
 > **Repository:** [https://github.com/justinmathew2/gatherly-ai-event-planner](https://github.com/justinmathew2/gatherly-ai-event-planner.git)  
 > **Total Repository Size:** < 1 MB (Strictly compliant with the < 10 MB limit)
 
@@ -213,6 +214,7 @@ For your contest submission form:
 
 - **Challenge**: `[Challenge 5] Celebration & Event Planner`
 - **Public GitHub Repository Link**: `https://github.com/justinmathew2/gatherly-ai-event-planner.git`
+- **Project Deployed Link**: `https://gatherly-ai-event-planner-fawn.vercel.app/`
 - **Describe the changes/updates made in the deployed version**:
   > Built Gatherly AI, a GenAI event planning copilot for Weddings, Milestone Birthdays, Community Festivals, and Corporate Gatherings. Features dynamic budget allocation with one-click AI rebalancing, countdown milestones, hour-by-hour day-of run-of-show with RFC-5545 iCal calendar export, vendor tracking with automated inquiry email drafting & interview questions, personalized aesthetic palettes with HEX copy, dietary-conscious catering menus, and an interactive context-aware AI planning copilot.
 - **Mention the Gen AI services utilized in the submission, and where did you utilize it?**:
