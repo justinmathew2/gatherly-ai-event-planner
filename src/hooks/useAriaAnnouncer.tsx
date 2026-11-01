@@ -55,3 +55,4 @@ export const AriaAnnouncerProvider: React.FC<{ children: ReactNode }> = ({ child
 export const useAriaAnnouncer = (): AriaAnnouncerContextType => {
   return useContext(AriaAnnouncerContext);
 };
+
